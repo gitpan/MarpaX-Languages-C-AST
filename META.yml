@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               MarpaX-Languages-C-AST
-version:            0.01
+version:            0.02
 abstract:           Translate a C source to an AST
 author:
     - Jean-Damien Durand <jeandamiendurand@free.fr>
@@ -9,13 +9,14 @@ distribution_type:  module
 configure_requires:
     ExtUtils::MakeMaker:  0
 build_requires:
-    Clone:         0
     Log::Any:      0
     Marpa::R2:     2.055002
     Module::Info:  0
     Test::More:    0
 requires:
     perl:  5.006
+resources:
+    repository:  https://github.com/jddurand/MarpaX-Languages-C-AST
 no_index:
     directory:
         - t

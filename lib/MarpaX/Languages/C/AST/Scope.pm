@@ -3,7 +3,7 @@ package MarpaX::Languages::C::AST::Scope;
 use 5.006;
 use strict;
 use warnings FATAL => 'all';
-use Clone qw/clone/;
+use Storable qw/dclone/;
 use Log::Any qw/$log/;
 
 =head1 NAME
@@ -12,11 +12,11 @@ MarpaX::Languages::C::AST::Scope - Scope management when translating a C source 
 
 =head1 VERSION
 
-Version 0.01
+Version 0.02
 
 =cut
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 
 =head1 SYNOPSIS
@@ -81,7 +81,7 @@ sub parseEnterScope {
   $self->_doDelayedExitScope();
 
   my $scope = $#{$self->{typedefPerScope}};
-  push(@{$self->{typedefPerScope}}, clone($self->{typedefPerScope}->[$scope]));
+  push(@{$self->{typedefPerScope}}, dclone($self->{typedefPerScope}->[$scope]));
 
   $log->debugf('Duplicated scope %d to %d', $scope, $scope + 1);
 }

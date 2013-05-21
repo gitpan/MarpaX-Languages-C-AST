@@ -15,11 +15,11 @@ MarpaX::Languages::C::AST - Translate a C source to an AST
 
 =head1 VERSION
 
-Version 0.01
+Version 0.02
 
 =cut
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 
 =head1 SYNOPSIS
@@ -57,8 +57,8 @@ typedef struct s1_ {int i1;} x1, y1;
 struct x1 {x1 i2;};
 x1 x;
 C_SOURCE_CODE
-    my $cAstObject = MarpaX::Languages::C::AST->new(\$cSourceCode);
-    print Dumper($cAstObject->parse(\$input));
+    my $cAstObject = MarpaX::Languages::C::AST->new();
+    print Dumper($cAstObject->parse(\$cSourceCode));
 
 =head1 SUBROUTINES/METHODS
 
