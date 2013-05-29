@@ -41,7 +41,7 @@ sub module_boilerplate_ok {
 TODO: {
   local $TODO = "Need to replace the boilerplate text";
 
-  module_boilerplate_ok(File::Spec->catfile(qw/lib MarpaX Languages C AST Grammar.pm/));
+  module_boilerplate_ok(File::Spec->catfile(qw/lib MarpaX Languages C AST Util.pm/));
 
 
 }

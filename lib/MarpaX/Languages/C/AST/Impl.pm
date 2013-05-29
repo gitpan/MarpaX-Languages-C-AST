@@ -1,9 +1,9 @@
 package MarpaX::Languages::C::AST::Impl;
 
-use 5.006;
 use strict;
 use warnings FATAL => 'all';
-use Marpa::R2 2.055_003;
+use MarpaX::Languages::C::AST::Util qw/traceAndUnpack/;
+use Marpa::R2 2.056000;
 use Carp qw/croak/;
 use MarpaX::Languages::C::AST::Impl::Logger;
 use Log::Any qw/$log/;
@@ -13,437 +13,6 @@ use Exporter 'import';
 
 our @EXPORT_OK = qw/DOT_PREDICTION DOT_COMPLETION LATEST_G1_EARLEY_SET_ID/;
 
-=head1 NAME
-
-MarpaX::Languages::C::AST::Impl - Implementation of Marpa's interface
-
-=head1 VERSION
-
-Version 0.02
-
-=cut
-
-our $VERSION = '0.02';
-
-
-=head1 SYNOPSIS
-
-This modules implements all needed Marpa calls using its Scanless interface. Please be aware that logging is done via Log::Any.
-
-Example:
-
-    use MarpaX::Languages::C::AST::Impl;
-
-    my $marpaImpl = MarpaX::Languages::C::AST::Impl->new();
-
-=head1 EXPORTS
-
-The constants DOT_PREDICTION (0), DOT_COMPLETION (-1) and LATEST_EARLEY_SET_ID (-1) are exported on demand.
-
-=head1 SUBROUTINES/METHODS
-
-Please note that except for the new, findInProgress, inspectG1 methods, all other methods maps directy to Marpa, passing all arguments as is. Therefore only the eventual arguments to new, findInProgress and inspectG1 are documented. Please see Marpa documentation for the other methods whenever needed.
-
-=head2 new
-
-Instanciate a new object. Takes as parameter two references to hashes: the grammar options, the recognizer options. In the recognizer, there is a grammar internal option that will be forced to the grammar object.
-
-=cut
-
-sub new {
-  my ($class, $grammarOptionsHashp, $recceOptionsHashp) = @_;
-
-  my $self  = {
-      _cacheRule => {}
-  };
-  $self->{grammar} = Marpa::R2::Scanless::G->new($grammarOptionsHashp);
-  if (defined($recceOptionsHashp)) {
-      $recceOptionsHashp->{grammar} = $self->{grammar};
-  } else {
-      $recceOptionsHashp = {grammar => $self->{grammar}};
-  }
-  $self->{recce} = Marpa::R2::Scanless::R->new($recceOptionsHashp);
-  bless($self, $class);
-
-  return $self;
-}
-
-=head2 findInProgress($earleySetId, $wantedDotPosition, $wantedLhs, $wantedRhsp, $fatalMode)
-
-Searches a rule at G1 Earley Set Id $earleySetId. The default Earley Set Id is the current one. $wantedLhs, if defined, is the LHS name. $wantedRhsp, if defined, is the list of RHS. $wantedDotPosition, if defined, is the dot position, that should be a number between 0 and the number of RHS, or -1. The shortcuts DOT_PREDICTION (0) and DOT_COMPLETION (-1) can be used if the caller import it. There is a special case: if $dotPrediction is defined, $wantedLhs is defined, and $wantedRhsp is undef then, if $dotPrediction is DOT_PREDICTION we will search any prediction of $wantedLhs, and if $dotPrediction is DOT_COMPLETION we will search any completion of $wantedLhs. This method will return a true value if there is a match.
-
-=cut
-
-sub findInProgress {
-    my ($self, $earleySetId, $wantedDotPosition, $wantedLhs, $wantedRhsp, $fatalMode) = @_;
-
-    $fatalMode ||= 0;
-
-    $log->debugf('findInProgress(%d, %s, "%s", %s, %d)', $earleySetId, $wantedDotPosition, $wantedLhs, $wantedRhsp, $fatalMode);
-
-    my $rc = 0;
-
-    my $i = 0;
-    foreach (@{$self->progress($earleySetId)}) {
-	my ($rule_id, $dotPosition, $origin) = @{$_};
-	#
-	# There two special cases in findInprogress:
-	# if $wantedDotPrediction == DOT_PREDICTION, $wantedLhs is defined, and $wantedRhsp is undef
-	#   => we are searching any dot position that is predicting $wantedLhs
-	# if $wantedDotPrediction == DOT_COMPLETION, $wantedLhs is defined, and $wantedRhsp is undef
-	#   => we are searching any dot position that is following lhs
-	#
-	my $found = 0;
-	my ($lhs, @rhs);
-	if (defined($wantedDotPosition) && defined($wantedLhs) && ! defined($wantedRhsp)) {
-	    if ($wantedDotPosition == DOT_PREDICTION) {
-		($lhs, @rhs) = $self->rule($rule_id);
-		if ($dotPosition != DOT_COMPLETION && $rhs[$dotPosition] eq $wantedLhs) {
-		    $found = 1;
-		}
-	    } elsif ($wantedDotPosition == DOT_COMPLETION) {
-		($lhs, @rhs) = $self->rule($rule_id);
-		if ($dotPosition != DOT_PREDICTION) {
-		    if ($dotPosition != DOT_COMPLETION) {
-			if ($rhs[$dotPosition-1] eq $wantedLhs) {
-			    $found = 1;
-			} elsif ($rhs[$dotPosition] eq $wantedLhs) { # indice -1
-			    $found = 1;
-			}
-		    }
-		}
-	    }
-	}
-	if (! $found) {
-	    next if (defined($wantedDotPosition) && ($dotPosition != $wantedDotPosition));
-	    ($lhs, @rhs) = $self->rule($rule_id);
-	    next if (defined($wantedLhs) && ($lhs ne $wantedLhs));
-	    next if (defined($wantedRhsp) && ! __PACKAGE__->_arrayEq(\@rhs, $wantedRhsp));
-	    $found = 1;
-	}
-	next if (! $found);
-	if ($fatalMode) {
-	    my $msg = sprintf('%s', $self->_sprintfDotPosition($earleySetId, $i, $dotPosition, $lhs, @rhs));
-	    fatalf($msg);
-	    croak($msg);
-	} else {
-	    $log->tracef('Match on: %s', $self->_sprintfDotPosition($earleySetId, $i, $dotPosition, $lhs, @rhs));
-	}
-	if (defined($wantedDotPosition) ||
-	    defined($wantedLhs) ||
-	    defined($wantedRhsp)) {
-	    $rc = 1;
-	    last;
-	}
-	++$i;
-    }
-
-    return($rc);
-}
-
-=head2 inspectG1($lexeme, $g1_location, $start_g1_locationp, $end_g1_locationp, $candidateRulesp, $matchesInG1p, $endConditionp)
-
-Inspects G1. Searched for a lexeme with name $lexeme, using $matchedInG1p as a match condition, from G1 Earley Set Id $g1_location and downwards. $matchesG1p is a reference to hash, where the key is a G1 location, and the value is 0 or 1. The match is successful only when $matchesG1p->{$g1} exist and has a true value. This match appear within $candidateRulesp and the search will end if $endConditionp is reached. $candidateRulesp is a reference to an array of arrays, where each later array has the form: [dotLocationStart, dotLocationEnd, $lhs, [ @rhs ]]. These are send as is to the method findProgress() using [dotLocation, $lhs, [ @rhs ]] and [dotLocationEnd, $lhs, [@rhs]]. The $endConditionp is an array of arrays, where each later array has the form [dotLocation, $lhs, [@rhs]], send as-is to the findProgress() method. If there is no match, this method returns undef. If there a match on $candidateRulesp but no match on $lexeme, it returns a false value. If there is match on both it returns a true value.
-
-=cut
-
-##################################################################
-# inspectG1
-# rc undef: no candidate rule found
-# rc 0    : candidate rule found, no match on $lexeme
-# rc 1    : candidate rule found, match on $lexeme
-#
-# ${ $start_g1_locationp} would contain the prediction G1 location
-# ${ $end_g1_locationp}   would contain its completion
-#
-# Take care they can be equal
-##################################################################
-sub inspectG1 {
-    my ($self, $lexeme, $g1_location, $start_g1_locationp, $end_g1_locationp, $candidateRulesp, $matchesInG1p, $endConditionp) = @_;
-
-    $g1_location ||= $self->latest_g1_location();
-
-    my ($start_g1_location, $end_g1_location) = (undef, undef);
-    my $indexInCandidates = 0;
-    my $end_condition = 0;
-    my $rc = undef;
-    while (1) {
-	#
-	# Search
-	#
-	if (! defined($end_g1_location) && defined($candidateRulesp)) {
-	    my $i = 0;
-	    foreach (@{$candidateRulesp}) {
-		my ($dotPredictionStart, $dotPredictionEnd, $lhs, $rhsp) = @{$_};
-		if ($self->findInProgress($g1_location, $dotPredictionEnd, $lhs, $rhsp, 0)) {
-		    $end_g1_location = $g1_location;
-		    $indexInCandidates = $i;
-		    last;
-		}
-		++$i;
-	    }
-	}
-	if (defined($end_g1_location) && ! defined($start_g1_location) && defined($candidateRulesp)) {
-	    my ($dotPredictionStart, $dotPredictionEnd, $lhs, $rhsp) = @{$candidateRulesp->[$indexInCandidates]};
-	    if ($self->findInProgress($g1_location, $dotPredictionStart, $lhs, $rhsp, 0)) {
-		$start_g1_location = $g1_location;
-	    }
-	}
-	if (defined($start_g1_location) && defined($end_g1_location)) {
-	    $rc = 0;
-	    $log->tracef('G1 range [%d, %d]', $start_g1_location, $end_g1_location);
-	    if ($start_g1_location > $end_g1_location) {
-		my $msg = sprintf('$start_g1_location %d > $end_g1_location %d !?', $start_g1_location, $end_g1_location);
-		$log->fatalf($msg);
-		croak $msg;
-	    }
-	    if (grep {exists($matchesInG1p->{$_}) && $matchesInG1p->{$_}} ($start_g1_location..$end_g1_location)) {
-		$log->tracef('G1 range [%d, %d] have %s', $start_g1_location, $end_g1_location, $lexeme);
-		if (defined($start_g1_locationp)) {
-		    ${$start_g1_locationp} = $start_g1_location;
-		}
-		if (defined($end_g1_locationp)) {
-		    ${$end_g1_locationp} = $end_g1_location;
-		}
-		$rc = 1;
-		last;
-	    } else {
-		$log->tracef('G1 range [%d, %d] do not have %s', $start_g1_location, $end_g1_location, $lexeme);
-	    }
-	    $start_g1_location = undef;
-	    $end_g1_location = undef;
-	}
-	#
-	# End condition
-	if (defined($endConditionp)) {
-	    foreach (@{$endConditionp}) {
-		my ($dotPrediction, $lhs, $rhsp) = @{$_};
-		if ($self->findInProgress($g1_location, $dotPrediction, $lhs, $rhsp, 0)) {
-		    $end_condition = 1;
-		    last;
-		}
-	    }
-	}
-	if ($end_condition) {
-	    last;
-	}
-	#
-	# Next loop
-	#
-	if (--$g1_location < 0) {
-	    last;
-	}
-    }
-
-    return($rc);
-}
-
-=head2 rule
-
-Returns Marpa's grammar's rule
-
-=cut
-
-sub rule {
-  my $self = shift;
-  #
-  # For a given grammar, the conversion ruleid->rule is a constant
-  # so it is legal to cache this data
-  #
-  my $ruleId = shift;
-  if (! exists($self->{_cacheRule}->{$ruleId})) {
-      $log->tracef('$grammar->rule(%d)', $ruleId);
-      my ($lhs, @rhs) = $self->{grammar}->rule($ruleId);
-      $self->{_cacheRule}->{$ruleId} = [ $lhs, @rhs ];
-  }
-  return @{$self->{_cacheRule}->{$ruleId}};
-}
-
-=head2 value
-
-Returns Marpa's recognizer's value
-
-=cut
-
-sub value {
-  my $self = shift;
-  $log->tracef('$recce->value()');
-  return $self->{recce}->value();
-}
-
-=head2 read
-
-Returns Marpa's recognizer's read
-
-=cut
-
-sub read {
-  my $self = shift;
-  #
-  # Well, we know that input is a reference to a string, and do not want its dump in the log...
-  $log->tracef('$recce->read(%s)', "@_");
-  return $self->{recce}->read(@_);
-}
-
-=head2 resume
-
-Returns Marpa's recognizer's resume
-
-=cut
-
-sub resume {
-  my $self = shift;
-  $log->tracef('$recce->resume()');
-  return $self->{recce}->resume();
-}
-
-=head2 last_completed
-
-Returns Marpa's recognizer's last_completed
-
-=cut
-
-sub last_completed {
-  my $self = shift;
-  $log->tracef('$recce->last_completed("%s")', @_);
-  return $self->{recce}->last_completed(@_);
-}
-
-=head2 last_completed_range
-
-Returns Marpa's recognizer's last_completed_range
-
-=cut
-
-sub last_completed_range {
-  my $self = shift;
-  $log->tracef('$recce->last_completed_range("%s")', @_);
-  return $self->{recce}->last_completed_range(@_);
-}
-
-=head2 range_to_string
-
-Returns Marpa's recognizer's range_to_string
-
-=cut
-
-sub range_to_string {
-  my $self = shift;
-  $log->tracef('$recce->range_to_string(%d, %d)', @_);
-  return $self->{recce}->range_to_string(@_);
-}
-
-=head2 progress
-
-Returns Marpa's recognizer's progress
-
-=cut
-
-sub progress {
-  my $self = shift;
-  $log->tracef('$recce->progress(%d)', @_);
-  return $self->{recce}->progress(@_);
-}
-
-=head2 event
-
-Returns Marpa's recognizer's event
-
-=cut
-
-sub event {
-  my $self = shift;
-  $log->tracef('$recce->event(%d)', @_);
-  return $self->{recce}->event(@_);
-}
-
-=head2 pause_lexeme
-
-Returns Marpa's recognizer's pause_lexeme
-
-=cut
-
-sub pause_lexeme {
-  my $self = shift;
-  $log->tracef('$recce->pause_lexeme()');
-  return $self->{recce}->pause_lexeme();
-}
-
-=head2 pause_span
-
-Returns Marpa's recognizer's pause_span
-
-=cut
-
-sub pause_span {
-  my $self = shift;
-  $log->tracef('$recce->pause_span()');
-  return $self->{recce}->pause_span();
-}
-
-=head2 line_column
-
-Returns Marpa's recognizer's line_column
-
-=cut
-
-sub line_column {
-  my $self = shift;
-  $log->tracef('$recce->line_column(%d)', @_);
-  return $self->{recce}->line_column(@_);
-}
-
-=head2 substring
-
-Returns Marpa's recognizer's substring
-
-=cut
-
-sub substring {
-  my $self = shift;
-  $log->tracef('$recce->substring(%d, %d)', @_);
-  return $self->{recce}->substring(@_);
-}
-
-=head2 lexeme_read
-
-Returns Marpa's recognizer's lexeme_read
-
-=cut
-
-sub lexeme_read {
-  my $self = shift;
-  $log->tracef('$recce->lexeme_read("%s", %d, %d, "%s")', @_);
-  return $self->{recce}->lexeme_read(@_);
-}
-
-=head2 latest_g1_location
-
-Returns Marpa's recognizer's latest_g1_location
-
-=cut
-
-sub latest_g1_location {
-  my $self = shift;
-  $log->tracef('$recce->latest_g1_location()');
-  return $self->{recce}->latest_g1_location();
-}
-
-=head2 g1_location_to_span
-
-Returns Marpa's recognizer's g1_location_to_span
-
-=cut
-
-sub g1_location_to_span {
-  my $self = shift;
-  $log->tracef('$recce->g1_location_to_span(%d)', @_);
-  return $self->{recce}->g1_location_to_span(@_);
-}
-
-#
-# INTERNAL METHODS
-#
 our $MARPA_TRACE_FILE_HANDLE;
 our $MARPA_TRACE_BUFFER;
 
@@ -465,6 +34,421 @@ sub BEGIN {
         $MARPA_TRACE_FILE_HANDLE = undef;
       }
     }
+}
+
+=head1 NAME
+
+MarpaX::Languages::C::AST::Impl - Implementation of Marpa's interface
+
+=head1 VERSION
+
+Version 0.03
+
+=cut
+
+our $VERSION = '0.03';
+
+
+=head1 SYNOPSIS
+
+This modules implements all needed Marpa calls using its Scanless interface. Please be aware that logging is done via Log::Any.
+
+Example:
+
+    use MarpaX::Languages::C::AST::Impl;
+
+    my $marpaImpl = MarpaX::Languages::C::AST::Impl->new();
+
+=head1 EXPORTS
+
+The constants DOT_PREDICTION (0), DOT_COMPLETION (-1) and LATEST_EARLEY_SET_ID (-1) are exported on demand.
+
+=head1 SUBROUTINES/METHODS
+
+=head2 new($class, $grammarOptionsHashp, $recceOptionsHashp)
+
+Instanciate a new object. Takes as parameter two references to hashes: the grammar options, the recognizer options. In the recognizer, there is a grammar internal option that will be forced to the grammar object. If the environment variable MARPA_TRACE_TERMINALS is setted to a true value, then internal Marpa trace on terminals is activated. If the environment MARPA_TRACE_VALUES is setted to a true value, then internal Marpa trace on values is actived. If the environment variable MARPA_TRACE is setted to a true value, then both terminals et values internal Marpa traces are activated.
+
+=cut
+
+sub new {
+
+  my ($class, $grammarOptionsHashp, $recceOptionsHashp) = @_;
+
+  my $self  = {
+      _cacheRule => {}
+  };
+  $self->{grammar} = Marpa::R2::Scanless::G->new($grammarOptionsHashp);
+  if (defined($recceOptionsHashp)) {
+      $recceOptionsHashp->{grammar} = $self->{grammar};
+  } else {
+      $recceOptionsHashp = {grammar => $self->{grammar}};
+  }
+  $recceOptionsHashp->{trace_terminals} = $ENV{MARPA_TRACE_TERMINALS} || $ENV{MARPA_TRACE} || 0;
+  $recceOptionsHashp->{trace_values} = $ENV{MARPA_TRACE_VALUES} || $ENV{MARPA_TRACE} || 0;
+  $recceOptionsHashp->{trace_file_handle} = $MARPA_TRACE_FILE_HANDLE;
+  $self->{recce} = Marpa::R2::Scanless::R->new($recceOptionsHashp);
+  bless($self, $class);
+
+  return $self;
+}
+
+=head2 findInProgress($self, $earleySetId, $wantedRuleId, $wantedDotPosition, $wantedOrigin, $wantedLhs, $wantedRhsp, $fatalMode, $indicesp, $matchesp, $originsp) = @_;
+
+Searches a rule at G1 Earley Set Id $earleySetId. The default Earley Set Id is the current one. $wantedRuleId, if defined, is the rule ID. $wantedDotPosition, if defined, is the dot position, that should be a number between 0 and the number of RHS, or -1. $wantedOrigin, if defined, is the wanted origin. In case $wantedRuleId is undef, the user can use $wantedLhs and/or $wantedRhs. $wantedLhs, if defined, is the LHS name. $wantedRhsp, if defined, is the list of RHS. $fatalMode, if defined and true, will mean the module will croak if there is a match. $indicesp, if defined, must be a reference to an array giving the indices from Marpa's output we are interested in. $matchesp, if defined, has to be a reference to an array, which will be filled reference to hashes like {ruleId=>$ruleId, dotPosition=>$dotPosition, origin=>$origin} that matched. You can use the method g1Describe() to fill it. $originsp, if defined, have to be a reference to a hash that will be filled with Earley Set Id origins as a key if the later is not already in it, the value number will be 0 when the key is created, regardless if there is a match or not. Any origin different than $earleySetId and zero (the root) will putted in it. We remind that for a prediction, origin is always the same as the location of the current report. The shortcuts DOT_PREDICTION (0) and DOT_COMPLETION (-1) can be used if the caller import it. There is a special case: if $dotPrediction is defined, $wantedLhs is defined, and $wantedRhsp is undef then, if $dotPrediction is DOT_PREDICTION we will search any prediction of $wantedLhs, and if $dotPrediction is DOT_COMPLETION we will search any completion of $wantedLhs. This method will return a true value if there is at least one match. If one of $wantedRuleId, $wantedDotPosition, $wantedOrigin, $wantedLhs, or $wantedRhsp is defined and there is match, this method stop at the first match.
+
+=cut
+
+sub findInProgress {
+    my $self = shift;
+
+    my $args = traceAndUnpack(['earleySetId', 'wantedRuleId', 'wantedDotPosition', 'wantedOrigin', 'wantedLhs', 'wantedRhsp', 'fatalMode', 'indicesp', 'matchesp', 'originsp'], @_);
+
+    $args->{fatalMode} ||= 0;
+
+    my $rc = 0;
+
+    my $i = 0;
+    foreach (@{$self->progress($args->{earleySetId})}) {
+	my ($ruleId, $dotPosition, $origin) = @{$_};
+	if ($origin != 0 && defined($args->{originsp}) && ! exists($args->{originsp}->{$origin})) {
+          $args->{originsp}->{$origin} = 0;
+	}
+	next if (defined($args->{indicesp}) && ! grep {$_ == $i} @{$args->{indicesp}});
+	#
+	# There two special cases in findInprogress:
+	# if $wantedDotPrediction == DOT_PREDICTION, $args->{wantedLhs} is defined, and $args->{wantedRhsp} is undef
+	#   => we are searching any dot position that is predicting $args->{wantedLhs}
+	# if $wantedDotPrediction == DOT_COMPLETION, $args->{wantedLhs} is defined, and $args->{wantedRhsp} is undef
+	#   => we are searching any dot position that is following lhs
+	#
+	my $found = 0;
+	my ($lhs, @rhs);
+	if (defined($args->{wantedDotPosition}) && defined($args->{wantedLhs}) && ! defined($args->{wantedRhsp})) {
+	    if ($args->{wantedDotPosition} == DOT_PREDICTION) {
+		($lhs, @rhs) = $self->rule($ruleId);
+		if ($dotPosition != DOT_COMPLETION && $rhs[$dotPosition] eq $args->{wantedLhs}) {
+		    $found = 1;
+		}
+	    } elsif ($args->{wantedDotPosition} == DOT_COMPLETION) {
+		($lhs, @rhs) = $self->rule($ruleId);
+		if ($dotPosition != DOT_PREDICTION) {
+		    if ($dotPosition != DOT_COMPLETION) {
+			if ($rhs[$dotPosition-1] eq $args->{wantedLhs}) {
+			    $found = 1;
+			} elsif ($rhs[$dotPosition] eq $args->{wantedLhs}) { # indice -1
+			    $found = 1;
+			}
+		    }
+		}
+	    }
+	}
+	if (! $found) {
+	    next if (defined($args->{wantedRuleId}) && ($ruleId != $args->{wantedRuleId}));
+	    next if (defined($args->{wantedDotPosition}) && ($dotPosition != $args->{wantedDotPosition}));
+	    next if (defined($args->{wantedOrigin}) && ($origin != $args->{wantedOrigin}));
+	    ($lhs, @rhs) = $self->rule($ruleId);
+	    next if (defined($args->{wantedLhs}) && ($lhs ne $args->{wantedLhs}));
+	    next if (defined($args->{wantedRhsp}) && ! __PACKAGE__->_arrayEq(\@rhs, $args->{wantedRhsp}));
+	    $found = 1;
+	}
+	next if (! $found);
+	if ($args->{fatalMode}) {
+	    my $msg = sprintf('%s', $self->_sprintfDotPosition($args->{earleySetId}, $i, $dotPosition, $lhs, @rhs));
+	    fatalf($msg);
+	    croak($msg);
+	} else {
+	    $log->tracef('Match on [ruleId=%d, dotPosition=%d, origin=%d] : %s', $ruleId, $dotPosition, $origin, $self->_sprintfDotPosition($args->{earleySetId}, $i, $dotPosition, $lhs, @rhs));
+            push(@{$args->{matchesp}}, {ruleId => $ruleId, dotPosition => $dotPosition, origin => $origin}) if (defined($args->{matchesp}));
+	}
+	if (defined($args->{wantedRuleId}) ||
+            defined($args->{wantedDotPosition}) ||
+	    defined($args->{wantedOrigin}) ||
+            defined($args->{wantedLhs}) ||
+	    defined($args->{wantedRhsp})) {
+	    $rc = 1;
+	    last;
+	}
+	++$i;
+    }
+
+    return($rc);
+}
+
+=head2 findInProgressShort($self, $wantedDotPosition, $wantedLhs, $wantedRhsp)
+
+This method is shortcut to findInProgress(), that will force findInProgress()'s parameter $earleySetId to -1 (i.e. current G1 location), and $wantedRuleId, $wantedOrigin, $fatalMode, $indicesp, $matchesp to undef. This method exist because, in practice, only dot position, lhs or rhs are of interest within the current G1 location.
+
+=cut
+
+sub findInProgressShort {
+  my $self = shift;
+
+  my $args = traceAndUnpack(['wantedDotPosition', 'wantedLhs', 'wantedRhsp'], @_);
+
+  return $self->findInProgress(-1, undef, $args->{wantedDotPosition}, undef, $args->{wantedLhs}, $args->{wantedRhsp}, undef, undef, undef, undef);
+}
+
+=head2 rule($self, $ruleId)
+
+Returns Marpa's grammar's rule. Because the output of Marpa's rule is a constant for a given $ruleId, any call to this method will use a cached result if it exist, create a cache otherwise.
+
+=cut
+
+sub rule {
+    my $self = shift;
+    my ($ruleId) = @_;
+
+  #
+  # For a given grammar, the conversion ruleid->rule is a constant
+  # so it is legal to cache this data
+  #
+  if (! exists($self->{_cacheRule}->{$ruleId})) {
+      my $args = traceAndUnpack(['ruleId'], @_);
+      my ($lhs, @rhs) = $self->{grammar}->rule($ruleId);
+      $self->{_cacheRule}->{$ruleId} = [ $lhs, @rhs ];
+  }
+  return @{$self->{_cacheRule}->{$ruleId}};
+}
+
+=head2 value($self)
+
+Returns Marpa's recognizer's value.
+
+=cut
+
+sub value {
+  my $self = shift;
+
+  my $args = traceAndUnpack([''], @_);
+
+  return $self->{recce}->value();
+}
+
+=head2 read($self, $inputp)
+
+Returns Marpa's recognizer's read. Argument is a reference to input.
+
+=cut
+
+sub read {
+  my ($self, $inputp) = @_;
+  #
+  # Well, we know that input is a reference to a string, and do not want its dump in the log...
+  #
+  my $args = traceAndUnpack(['inputp'], "$inputp");
+
+  return $self->{recce}->read($inputp);
+}
+
+=head2 resume($self)
+
+Returns Marpa's recognizer's resume.
+
+=cut
+
+sub resume {
+  my $self = shift;
+
+  my $args = traceAndUnpack([''], @_);
+
+  return $self->{recce}->resume();
+}
+
+=head2 last_completed($self, $symbol)
+
+Returns Marpa's recognizer's last_completed for symbol $symbol.
+
+=cut
+
+sub last_completed {
+  my $self = shift;
+
+  my $args = traceAndUnpack(['symbol'], @_);
+
+  return $self->{recce}->last_completed($args->{symbol});
+}
+
+=head2 last_completed_range($self, $symbol)
+
+Returns Marpa's recognizer's last_completed_range for symbol $symbol.
+
+=cut
+
+sub last_completed_range {
+  my $self = shift;
+
+  my $args = traceAndUnpack(['symbol'], @_);
+
+  return $self->{recce}->last_completed_range($args->{symbol});
+}
+
+=head2 range_to_string($self, $start, $end)
+
+Returns Marpa's recognizer's range_to_string for a start value of $start and an end value of $end.
+
+=cut
+
+sub range_to_string {
+  my $self = shift;
+
+  my $args = traceAndUnpack(['start', 'end'], @_);
+
+  return $self->{recce}->range_to_string($args->{start}, $args->{end});
+}
+
+=head2 progress($self, $g1)
+
+Returns Marpa's recognizer's progress for a g1 location $g1.
+
+=cut
+
+sub progress {
+  my $self = shift;
+
+  my $args = traceAndUnpack(['g1'], @_);
+
+  return $self->{recce}->progress($args->{g1});
+}
+
+=head2 event($self, $eventNumber)
+
+Returns Marpa's recognizer's event for event number $eventNumber.
+
+=cut
+
+sub event {
+  my $self = shift;
+
+  my $args = traceAndUnpack(['eventNumber'], @_);
+
+  return $self->{recce}->event($args->{eventNumber});
+}
+
+=head2 pause_lexeme($self)
+
+Returns Marpa's recognizer's pause_lexeme.
+
+=cut
+
+sub pause_lexeme {
+  my $self = shift;
+
+  my $args = traceAndUnpack([''], @_);
+
+  return $self->{recce}->pause_lexeme();
+}
+
+=head2 pause_span($self)
+
+Returns Marpa's recognizer's pause_span.
+
+=cut
+
+sub pause_span {
+  my $self = shift;
+
+  my $args = traceAndUnpack([''], @_);
+
+  return $self->{recce}->pause_span();
+}
+
+=head2 literal($self, $start, $length)
+
+Returns Marpa's recognizer's literal.
+
+=cut
+
+sub literal {
+  my $self = shift;
+
+  my $args = traceAndUnpack(['start', 'length'], @_);
+
+  return $self->{recce}->literal($args->{start}, $args->{length});
+}
+
+=head2 line_column($self, $start)
+
+Returns Marpa's recognizer's line_column at eventual $start location in the input stream. Default location is current location.
+
+=cut
+
+sub line_column {
+  my $self = shift;
+
+  my $args = traceAndUnpack(['start'], @_);
+
+  return $self->{recce}->line_column($args->{start});
+}
+
+=head2 substring($self, $start, $length)
+
+Returns Marpa's recognizer's substring corresponding to g1 span ($start, $length).
+
+=cut
+
+sub substring {
+  my $self = shift;
+
+  my $args = traceAndUnpack(['start', 'length'], @_);
+
+  return $self->{recce}->substring($args->{start}, $args->{length});
+}
+
+=head2 lexeme_read($self, $lexeme, $start, $length, $value)
+
+Returns Marpa's recognizer's lexeme_read for lexeme $lexeme, at start position $start, length $length and value $value.
+
+=cut
+
+sub lexeme_read {
+  my $self = shift;
+
+  my $args = traceAndUnpack(['lexeme', 'start', 'length', 'value'], @_);
+
+  return $self->{recce}->lexeme_read($args->{lexeme}, $args->{start}, $args->{length}, $args->{value});
+}
+
+=head2 latest_g1_location($self)
+
+Returns Marpa's recognizer's latest_g1_location.
+
+=cut
+
+sub latest_g1_location {
+  my $self = shift;
+
+  my $args = traceAndUnpack([''], @_);
+
+  return $self->{recce}->latest_g1_location();
+}
+
+=head2 g1_location_to_span($self, $g1)
+
+Returns Marpa's recognizer's g1_location_to_span for a g1 location $g1.
+
+=cut
+
+sub g1_location_to_span {
+  my $self = shift;
+
+  my $args = traceAndUnpack(['g1'], @_);
+
+  return $self->{recce}->g1_location_to_span($args->{g1});
+}
+
+#
+# INTERNAL METHODS
+#
+sub _endCondition {
+  my ($self, $g1, $endConditionp) = @_;
+
+  my $rc = 0;
+  if (defined($endConditionp)) {
+    my ($dotPrediction, $lhs, $rhsp) = @{$endConditionp};
+    $rc = $self->findInProgress($g1, undef, $dotPrediction, undef, $lhs, $rhsp, undef, undef, undef, undef);
+  }
+  return $rc;
 }
 
 sub _sprintfDotPosition {

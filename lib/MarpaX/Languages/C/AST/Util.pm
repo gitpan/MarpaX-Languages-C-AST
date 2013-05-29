@@ -1,16 +1,16 @@
-package MarpaX::Languages::C::AST::Impl::Logger;
-#
-## C.f. http://osdir.com/ml/lang.perl.modules.log4perl.devel/2007-03/msg00030.html
-#
+package MarpaX::Languages::C::AST::Util;
+
 use strict;
 use warnings FATAL => 'all';
-use diagnostics;
-use Carp;
-use Log::Any;
+use Exporter 'import';
+use Log::Any qw/$log/;
+use Data::Dumper;
+
+our @EXPORT_OK = qw/whoami whowasi traceAndUnpack/;
 
 =head1 NAME
 
-MarpaX::Languages::C::AST::Impl::Logger - Log::Any implementation on top of Marpa
+MarpaX::Languages::C::AST::Util - Class method utilities
 
 =head1 VERSION
 
@@ -21,57 +21,80 @@ Version 0.03
 our $VERSION = '0.03';
 
 
-sub BEGIN {
-    #
-    ## Some Log implementation specificities
-    #
-    my $have_Log_Log4perl = eval 'use Log::Log4perl; 1;' || 0;
-    if ($have_Log_Log4perl != 0) {
+=head1 SYNOPSIS
+
+This modules implements some function utilities. This is inspired from L<https://kb.wisc.edu/middleware/page.php?id=4309>.
+
+Example:
+
+use MarpaX::Languages::C::AST::Util qw/whoami whowasi traceAndUnpack/;
+
+my $whoami = whoami();
+my $whowasi = whowasi();
+callIt(0, '1', [2], {3 => 4});
+
+sub callIt {
+    my $hash = traceAndUnpack(['var1', 'var2', 'array1p', 'hash1p'], @_);
+}
+
+=head1 EXPORTS
+
+The method whoami() is exported on demand.
+
+=head1 SUBROUTINES/METHODS
+
+=head2 whoami()
+
+Returns the name of the calling routine.
+
+=cut
+
+sub whoami {
+    return (caller(1))[3];
+}
+
+=head2 whowasi()
+
+Returns the name of the parent's calling routine.
+
+=cut
+
+sub whowasi {
+    return (caller(2))[3];
+}
+
+=head2 traceAndUnpack([@nameOfArguments], @arguments)
+
+Returns a hash mapping @nameOfArguments to @arguments and trace it. The tracing is done using a method quite similar to Log::Any. Tracing and hash mapping stops at the end of @nameOfArguments or @arguments.
+
+=cut
+
+sub traceAndUnpack {
+    my $nameOfArgumentsp = shift;
+
+    my $whowasi = whowasi();
+    my @string = ();
+    my $min1 = scalar(@{$nameOfArgumentsp});
+    my $min2 = scalar(@_);
+    my $min = ($min1 < $min2) ? $min1 : $min2;
+    my $rc = {};
+    foreach (0..--$min) {
+	my ($key, $value) = ($nameOfArgumentsp->[$_], $_[$_]);
+	my $string = Data::Dumper->new([$value], [$key])->Indent(0)->Sortkeys(1)->Quotekeys(0)->Terse(0)->Dump();
+	$rc->{$key} = $value;
 	#
-	## Here we put know hooks for logger implementations
+	# Remove the ';'
 	#
-	Log::Log4perl->wrapper_register(__PACKAGE__);
+	substr($string, -1, 1, '');
+	push(@string, $string);
     }
+    #
+    # Skip MarpaX::Languages::C::AST::if any
+    #
+    $whowasi =~ s/^MarpaX::Languages::C::AST:://;
+    $log->tracef('%s(%s)', $whowasi, join(', ', @string));
+    return($rc);
 }
-
-sub TIEHANDLE {
-  my($class, %options) = @_;
-
-  my $self = {
-              level => exists($options{level}) ? ($options{level} || 'trace') : 'trace',
-              category => exists($options{category}) ? ($options{category} || '') : '',
-             };
-
-  $self->{logger} = Log::Any->get_logger(category => $self->{category});
-
-  bless $self, $class;
-}
-
-sub PRINT {
-  my $self = shift;
-  my $logger = $self->{logger} || '';
-  my $level = $self->{level} || '';
-  if ($logger && $level) {
-    $logger->trace(@_);
-  }
-  return 1;
-}
-
-sub PRINTF {
-  my $self = shift;
-  return $self->PRINT(sprintf(@_));
-}
-
-sub UNTIE {
-  my ($obj, $count) = @_;
-  if ($count) {
-    croak "untie attempted while $count inner references still exist";
-  }
-}
-
-=head1 SEE ALSO
-
-L<Log::Any>
 
 =head1 AUTHOR
 
@@ -162,4 +185,4 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 =cut
 
-1; # End of MarpaX::Languages::C::AST::Impl::Logger
+1; # End of MarpaX::Languages::C::AST::Util

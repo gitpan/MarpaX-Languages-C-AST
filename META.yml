@@ -1,27 +1,29 @@
---- #YAML:1.0
-name:               MarpaX-Languages-C-AST
-version:            0.02
-abstract:           Translate a C source to an AST
+---
+abstract: 'Translate a C source to an AST'
 author:
-    - Jean-Damien Durand <jeandamiendurand@free.fr>
-license:            Artistic_2_0
-distribution_type:  module
-configure_requires:
-    ExtUtils::MakeMaker:  0
+  - 'Jean-Damien Durand <jeandamiendurand@free.fr>'
 build_requires:
-    Log::Any:      0
-    Marpa::R2:     2.055002
-    Module::Info:  0
-    Test::More:    0
-requires:
-    perl:  5.006
-resources:
-    repository:  https://github.com/jddurand/MarpaX-Languages-C-AST
-no_index:
-    directory:
-        - t
-        - inc
-generated_by:       ExtUtils::MakeMaker version 6.57_05
+  ExtUtils::MakeMaker: 0
+  Log::Any: 0
+  Marpa::R2: 2.056
+  Test::More: 0
+configure_requires:
+  ExtUtils::MakeMaker: 0
+dynamic_config: 1
+generated_by: 'ExtUtils::MakeMaker version 6.66, CPAN::Meta::Converter version 2.120921'
+license: unknown
 meta-spec:
-    url:      http://module-build.sourceforge.net/META-spec-v1.4.html
-    version:  1.4
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: MarpaX-Languages-C-AST
+no_index:
+  directory:
+    - t
+    - inc
+requires:
+  Log::Any: 0
+  Marpa::R2: 2.056
+  perl: 5.010000
+resources:
+  repository: https://github.com/jddurand/MarpaX-Languages-C-AST
+version: 0.03
