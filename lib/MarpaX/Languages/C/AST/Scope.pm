@@ -11,7 +11,7 @@ BEGIN {
 use Storable qw/dclone/;
 use Log::Any qw/$log/;
 
-our $VERSION = '0.06'; # VERSION
+our $VERSION = '0.07'; # VERSION
 
 
 sub new {
@@ -148,7 +148,7 @@ MarpaX::Languages::C::AST::Scope - Scope management when translating a C source 
 
 =head1 VERSION
 
-version 0.06
+version 0.07
 
 =head1 SYNOPSIS
 

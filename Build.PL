@@ -17,7 +17,7 @@ my %module_build_args = (
     "Jean-Damien Durand <jeandamiendurand\@free.fr>"
   ],
   "dist_name" => "MarpaX-Languages-C-AST",
-  "dist_version" => "0.06",
+  "dist_version" => "0.07",
   "license" => "perl",
   "module_name" => "MarpaX::Languages::C::AST",
   "recommends" => {},

@@ -11,7 +11,7 @@ BEGIN {
 use MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011;
 use Carp qw/croak/;
 
-our $VERSION = '0.06'; # VERSION
+our $VERSION = '0.07'; # VERSION
 
 
 sub new {
@@ -61,7 +61,7 @@ MarpaX::Languages::C::AST::Grammar - C grammar writen in Marpa BNF
 
 =head1 VERSION
 
-version 0.06
+version 0.07
 
 =head1 SYNOPSIS
 
