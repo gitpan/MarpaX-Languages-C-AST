@@ -1,48 +1,82 @@
-use version 0.77; # perl 5.10 minimum, which is Marpa's requirement as well
+
 use strict;
-use warnings FATAL => 'all';
-use ExtUtils::MakeMaker;
-use File::Spec;
-use File::Find;
+use warnings;
 
-my @tests = ();
-find({wanted => \&wanted}, 't');
-sub wanted { /\.t$/i && push(@tests, File::Spec->catfile($File::Find::dir, $_)); }
+use 5.010;
 
-my %args = (
-    MIN_PERL_VERSION => '5.10.0',                       # Marpa itself, given/when for us
-    NAME             => 'MarpaX::Languages::C::AST',
-    AUTHOR           => q{Jean-Damien Durand <jeandamiendurand@free.fr>},
-    VERSION_FROM     => 'lib/MarpaX/Languages/C/AST.pm',
-    ABSTRACT_FROM    => 'lib/MarpaX/Languages/C/AST.pm',
-    LICENSE          => 'Artistic_2_0',
-    PL_FILES         => {},
-    CONFIGURE_REQUIRES => {
-        'ExtUtils::MakeMaker' => 0,
-    },
-    PREREQ_PM => {
-        'Log::Any'                    => 0,
-        'Marpa::R2'                   => 2.056000
-    },
-    META_MERGE        => {
-	resources => {
-	    repository  =>  'https://github.com/jddurand/MarpaX-Languages-C-AST',
-	},
-    },
-    dist  => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
-    clean => { FILES => 'MarpaX-Languages-C-AST-*' },
-    test => { TESTS => "@tests" } # Works on all platforms because there is no special char, no space, etc
+use ExtUtils::MakeMaker 6.30;
+
+
+
+my %WriteMakefileArgs = (
+  "ABSTRACT" => "Translate a C source to an AST",
+  "AUTHOR" => "Jean-Damien Durand <jeandamiendurand\@free.fr>",
+  "BUILD_REQUIRES" => {
+    "Module::Build" => "0.3601"
+  },
+  "CONFIGURE_REQUIRES" => {
+    "Module::Build" => "0.3601"
+  },
+  "DISTNAME" => "MarpaX-Languages-C-AST",
+  "EXE_FILES" => [],
+  "LICENSE" => "perl",
+  "NAME" => "MarpaX::Languages::C::AST",
+  "PREREQ_PM" => {
+    "Carp" => 0,
+    "Class::Runtime" => 0,
+    "Data::Dumper" => 0,
+    "Exporter" => 0,
+    "Log::Any" => 0,
+    "Marpa::R2" => "2.056000",
+    "Storable" => 0,
+    "constant" => 0,
+    "diagnostics" => 0,
+    "strict" => 0,
+    "warnings" => 0
+  },
+  "TEST_REQUIRES" => {
+    "File::Find" => 0,
+    "File::Temp" => 0,
+    "Test::More" => 0,
+    "tainting" => 0
+  },
+  "VERSION" => "0.04",
+  "test" => {
+    "TESTS" => "t/*.t"
+  }
 );
 
-my $TEST_REQUIRES = {
-    'Test::More'                  => 0,
-    %{$args{PREREQ_PM}}
-};
 
-if (version->parse($ExtUtils::MakeMaker::VERSION) >= version->parse('6.63_03')) {
-    $args{TEST_REQUIRES} = $TEST_REQUIRES;
-} else {
-    $args{BUILD_REQUIRES} = $TEST_REQUIRES;
+unless ( eval { ExtUtils::MakeMaker->VERSION(6.63_03) } ) {
+  my $tr = delete $WriteMakefileArgs{TEST_REQUIRES};
+  my $br = $WriteMakefileArgs{BUILD_REQUIRES};
+  for my $mod ( keys %$tr ) {
+    if ( exists $br->{$mod} ) {
+      $br->{$mod} = $tr->{$mod} if $tr->{$mod} > $br->{$mod};
+    }
+    else {
+      $br->{$mod} = $tr->{$mod};
+    }
+  }
 }
 
-WriteMakefile(%args);
+unless ( eval { ExtUtils::MakeMaker->VERSION(6.56) } ) {
+  my $br = delete $WriteMakefileArgs{BUILD_REQUIRES};
+  my $pp = $WriteMakefileArgs{PREREQ_PM};
+  for my $mod ( keys %$br ) {
+    if ( exists $pp->{$mod} ) {
+      $pp->{$mod} = $br->{$mod} if $br->{$mod} > $pp->{$mod};
+    }
+    else {
+      $pp->{$mod} = $br->{$mod};
+    }
+  }
+}
+
+delete $WriteMakefileArgs{CONFIGURE_REQUIRES}
+  unless eval { ExtUtils::MakeMaker->VERSION(6.52) };
+
+WriteMakefile(%WriteMakefileArgs);
+
+
+

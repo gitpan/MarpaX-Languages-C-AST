@@ -10,7 +10,7 @@ use Data::Dumper;
 # Init log
 #
 our $defaultLog4perlConf = <<DEFAULT_LOG4PERL_CONF;
-log4perl.rootLogger              = DEBUG, Screen
+log4perl.rootLogger              = WARN, Screen
 log4perl.appender.Screen         = Log::Log4perl::Appender::Screen
 log4perl.appender.Screen.stderr  = 0
 log4perl.appender.Screen.layout  = PatternLayout
