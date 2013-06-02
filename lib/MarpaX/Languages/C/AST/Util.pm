@@ -2,9 +2,6 @@ use strict;
 use warnings FATAL => 'all';
 
 package MarpaX::Languages::C::AST::Util;
-BEGIN {
-  $MarpaX::Languages::C::AST::Util::AUTHORITY = 'cpan:JDDPAUSE';
-}
 
 # ABSTRACT: C Translation to AST - Class method utilities
 
@@ -12,7 +9,7 @@ use Exporter 'import';
 use Log::Any qw/$log/;
 use Data::Dumper;
 
-our $VERSION = '0.07'; # VERSION
+our $VERSION = '0.08'; # VERSION
 # CONTRIBUTORS
 
 our @EXPORT_OK = qw/whoami whowasi traceAndUnpack/;
@@ -61,19 +58,17 @@ __END__
 
 =pod
 
+=encoding utf-8
+
 =head1 NAME
 
 MarpaX::Languages::C::AST::Util - C Translation to AST - Class method utilities
 
 =head1 VERSION
 
-version 0.07
+version 0.08
 
-=head1 DESCRIPTION
-
-This modules implements some function utilities. This is inspired from L<https://kb.wisc.edu/middleware/page.php?id=4309>.
-
-=head1 SYNPOSIS
+=head1 SYNOPSIS
 
     use MarpaX::Languages::C::AST::Util qw/whoami whowasi traceAndUnpack/;
 
@@ -84,6 +79,10 @@ This modules implements some function utilities. This is inspired from L<https:/
     sub callIt {
         my $hash = traceAndUnpack(['var1', 'var2', 'array1p', 'hash1p'], @_);
     }
+
+=head1 DESCRIPTION
+
+This modules implements some function utilities. This is inspired from L<https://kb.wisc.edu/middleware/page.php?id=4309>.
 
 =head1 EXPORTS
 

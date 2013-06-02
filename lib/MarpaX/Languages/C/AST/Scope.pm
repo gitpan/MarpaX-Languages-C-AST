@@ -2,16 +2,13 @@ use strict;
 use warnings FATAL => 'all';
 
 package MarpaX::Languages::C::AST::Scope;
-BEGIN {
-  $MarpaX::Languages::C::AST::Scope::AUTHORITY = 'cpan:JDDPAUSE';
-}
 
 # ABSTRACT: Scope management when translating a C source to an AST
 
 use Storable qw/dclone/;
 use Log::Any qw/$log/;
 
-our $VERSION = '0.07'; # VERSION
+our $VERSION = '0.08'; # VERSION
 
 
 sub new {
@@ -142,13 +139,15 @@ __END__
 
 =pod
 
+=encoding utf-8
+
 =head1 NAME
 
 MarpaX::Languages::C::AST::Scope - Scope management when translating a C source to an AST
 
 =head1 VERSION
 
-version 0.07
+version 0.08
 
 =head1 SYNOPSIS
 
@@ -176,7 +175,7 @@ version 0.07
 
 This modules manages the scopes when translation a C source into an AST tree. This module is an implementation of the article:
 
-I<Resolving Typedefs in a Multipass C Compiler> from I<Journal of C Languages Translation>, Volume 2, Number 4, writen by W.M. McKeeman. A online version may be accessed at L<http://www.cs.dartmouth.edu/~mckeeman/references/JCLT/ResolvingTypedefsInAMultipassCCompiler.pdf>. Please note that this module is logging via Log::Any.
+I<Resolving Typedefs in a Multipass C Compiler> from I<Journal of C Languages Translation>, Volume 2, Number 4, written by W.M. McKeeman. A online version may be accessed at L<http://www.cs.dartmouth.edu/~mckeeman/references/JCLT/ResolvingTypedefsInAMultipassCCompiler.pdf>. Please note that this module is logging via Log::Any.
 
 =head1 SUBROUTINES/METHODS
 

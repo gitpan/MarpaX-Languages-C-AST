@@ -1,6 +1,4 @@
-Build.PL
 Changes
-INSTALL
 LICENSE
 MANIFEST
 META.json
@@ -21,10 +19,11 @@ lib/MarpaX/Languages/C/AST/Impl/Logger.pm
 lib/MarpaX/Languages/C/AST/Scope.pm
 lib/MarpaX/Languages/C/AST/Util.pm
 t/00-compile.t
+t/00-report-prereqs.t
 t/if-if-else.data
 t/if-if-else.t
-weaver.ini
 xt/author/critic.t
+xt/author/pod-spell.t
 xt/author/test-eol.t
 xt/release/cpan-changes.t
 xt/release/dist-manifest.t

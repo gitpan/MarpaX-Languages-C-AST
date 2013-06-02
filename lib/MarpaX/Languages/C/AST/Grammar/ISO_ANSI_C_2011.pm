@@ -2,13 +2,10 @@ use strict;
 use warnings FATAL => 'all';
 
 package MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011;
-BEGIN {
-  $MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011::AUTHORITY = 'cpan:JDDPAUSE';
-}
 
-# ABSTRACT: ISO ANSI C 2011 grammar writen in Marpa BNF
+# ABSTRACT: ISO ANSI C 2011 grammar written in Marpa BNF
 
-our $VERSION = '0.07'; # VERSION
+our $VERSION = '0.08'; # VERSION
 
 
 sub new {
@@ -46,13 +43,15 @@ sub recce_option {
 
 =pod
 
+=encoding utf-8
+
 =head1 NAME
 
-MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011 - ISO ANSI C 2011 grammar writen in Marpa BNF
+MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011 - ISO ANSI C 2011 grammar written in Marpa BNF
 
 =head1 VERSION
 
-version 0.07
+version 0.08
 
 =head1 SYNOPSIS
 
@@ -68,7 +67,7 @@ version 0.07
 
 =head1 DESCRIPTION
 
-This modules returns describes the ISO ANSI C 2011 C grammar writen in Marpa BNF, as of L<http://www.quut.com/c/ANSI-C-grammar-y-2011.html> and L<http://www.quut.com/c/ANSI-C-grammar-l.html>.
+This modules returns describes the ISO ANSI C 2011 C grammar written in Marpa BNF, as of L<http://www.quut.com/c/ANSI-C-grammar-y-2011.html> and L<http://www.quut.com/c/ANSI-C-grammar-l.html>.
 
 =head1 SUBROUTINES/METHODS
 

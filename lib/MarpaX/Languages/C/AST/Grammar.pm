@@ -2,16 +2,13 @@ use strict;
 use warnings FATAL => 'all';
 
 package MarpaX::Languages::C::AST::Grammar;
-BEGIN {
-  $MarpaX::Languages::C::AST::Grammar::AUTHORITY = 'cpan:JDDPAUSE';
-}
 
-# ABSTRACT: C grammar writen in Marpa BNF
+# ABSTRACT: C grammar written in Marpa BNF
 
 use MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011;
 use Carp qw/croak/;
 
-our $VERSION = '0.07'; # VERSION
+our $VERSION = '0.08'; # VERSION
 
 
 sub new {
@@ -55,13 +52,15 @@ __END__
 
 =pod
 
+=encoding utf-8
+
 =head1 NAME
 
-MarpaX::Languages::C::AST::Grammar - C grammar writen in Marpa BNF
+MarpaX::Languages::C::AST::Grammar - C grammar written in Marpa BNF
 
 =head1 VERSION
 
-version 0.07
+version 0.08
 
 =head1 SYNOPSIS
 
@@ -74,7 +73,7 @@ version 0.07
 
 =head1 DESCRIPTION
 
-This modules returns C grammar(s) writen in Marpa BNF.
+This modules returns C grammar(s) written in Marpa BNF.
 Current grammars are:
 =over
 =item *

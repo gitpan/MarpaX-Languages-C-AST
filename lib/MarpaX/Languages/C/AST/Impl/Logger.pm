@@ -2,9 +2,6 @@ use strict;
 use warnings FATAL => 'all';
 
 package MarpaX::Languages::C::AST::Impl::Logger;
-BEGIN {
-  $MarpaX::Languages::C::AST::Impl::Logger::AUTHORITY = 'cpan:JDDPAUSE';
-}
 
 # ABSTRACT: Log::Any implementation on top of Marpa
 
@@ -13,7 +10,7 @@ use Carp;
 use Log::Any;
 use Class::Runtime;
 
-our $VERSION = '0.07'; # VERSION
+our $VERSION = '0.08'; # VERSION
 
 sub BEGIN {
     #
@@ -71,17 +68,19 @@ __END__
 
 =pod
 
+=encoding utf-8
+
 =head1 NAME
 
 MarpaX::Languages::C::AST::Impl::Logger - Log::Any implementation on top of Marpa
 
 =head1 VERSION
 
-version 0.07
+version 0.08
 
 =head1 DESCRIPTION
 
-This module is a Log::Any wrapper on top of Marpa, instancied with a trace_file_handle tied to this package
+This module is a Log::Any wrapper on top of Marpa, instantiated with a trace_file_handle tied to this package
 
 =head1 SEE ALSO
 

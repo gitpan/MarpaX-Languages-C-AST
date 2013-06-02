@@ -2,7 +2,7 @@ NAME
     MarpaX::Languages::C::AST - Translate a C source to an AST
 
 VERSION
-    version 0.07
+    version 0.08
 
 SYNOPSIS
         use strict;
@@ -45,13 +45,13 @@ DESCRIPTION
     on top on the C grammar are not implemented, for example constraint on
     the number of storage class specifiers, uniqueness of labeled statements
     within a function, etc.. This is left to a compiler, which is not the
-    goal here. So, to state things clearly, this module is adressing the
+    goal here. So, to state things clearly, this module is addressing the
     *ambiguities* of the grammar itself, i.e. the dangling else, the
     typedef/enum/identifier. And produces an AST of the parse tree value.
 
 SUBROUTINES/METHODS
   new($class, $grammarName)
-    Instanciate a new object. Takes as parameter an optional base name of a
+    Instantiate a new object. Takes as parameter an optional base name of a
     grammar. Default is 'ISO-ANSI-C-2011'.
 
   parse($self, $referenceToSourceCodep, $optionalArrayOfValuesb)
@@ -60,6 +60,20 @@ SUBROUTINES/METHODS
     flag saying if the return value should be an array of all values or not.
     If this flag is false, the module will croak if there more than one
     parse tree value.
+
+SUPPORT
+  Bugs / Feature Requests
+    Please report any bugs or feature requests through the issue tracker at
+    <https://rt.cpan.org/Public/Dist/Display.html?Name=MarpaX-Languages-C-AS
+    T>. You will be notified automatically of any progress on your issue.
+
+  Source Code
+    This is open source software. The code repository is available for
+    public review and contribution under the terms of the license.
+
+    <https://github.com/jddurand/marpax-languages-c-ast>
+
+      git clone git://github.com/jddurand/marpax-languages-c-ast.git
 
 AUTHOR
     Jean-Damien Durand <jeandamiendurand@free.fr>
