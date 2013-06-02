@@ -8,7 +8,7 @@ BEGIN {
 
 # ABSTRACT: ISO ANSI C 2011 grammar writen in Marpa BNF
 
-our $VERSION = '0.04'; # VERSION
+our $VERSION = '0.05'; # VERSION
 
 
 sub new {
@@ -52,7 +52,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011 - ISO ANSI C 2011 grammar wr
 
 =head1 VERSION
 
-version 0.04
+version 0.05
 
 =head1 SYNOPSIS
 

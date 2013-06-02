@@ -1,6 +1,12 @@
 Changelog for MarpaX-Languages-C-AST
 
-0.04 2013-06-02T17:04:08
+0.05 2013-06-02T17:13:04
+ [Jean-Damien Durand <jeandamiendurand@free.fr>]
+ - Removed non needed dzil.sh, this also allow to have a clean tag, but
+   Dist::Zilla perturbed a bit the followup of tag v.s. official releases
+
+
+v0.04 2013-06-02T17:03:14
  [Jean-Damien Durand <jeandamiendurand@free.fr>]
  - Uncommentedd UploadToCPAN
 

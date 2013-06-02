@@ -13,7 +13,7 @@ use Carp;
 use Log::Any;
 use Class::Runtime;
 
-our $VERSION = '0.04'; # VERSION
+our $VERSION = '0.05'; # VERSION
 
 sub BEGIN {
     #
@@ -77,7 +77,7 @@ MarpaX::Languages::C::AST::Impl::Logger - Log::Any implementation on top of Marp
 
 =head1 VERSION
 
-version 0.04
+version 0.05
 
 =head1 DESCRIPTION
 
