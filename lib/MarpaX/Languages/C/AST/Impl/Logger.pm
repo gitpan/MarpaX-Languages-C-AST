@@ -8,17 +8,15 @@ package MarpaX::Languages::C::AST::Impl::Logger;
 use diagnostics;
 use Carp;
 use Log::Any;
-use Class::Runtime;
 
-our $VERSION = '0.08'; # VERSION
+our $VERSION = '0.09'; # VERSION
 
 sub BEGIN {
     #
     ## Some Log implementation specificities
     #
-    my $class = 'Log::Log4perl';
-    my $cl = Class::Runtime->new( class=> $class );
-    if ($cl->isLoaded || $cl->load) {
+    my $log4perl = eval 'use Log::Log4perl; 1;' || 0; ## no critic
+    if ($log4perl) {
 	#
 	## Here we put know hooks for logger implementations
 	#
@@ -76,7 +74,7 @@ MarpaX::Languages::C::AST::Impl::Logger - Log::Any implementation on top of Marp
 
 =head1 VERSION
 
-version 0.08
+version 0.09
 
 =head1 DESCRIPTION
 

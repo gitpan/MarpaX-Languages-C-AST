@@ -9,7 +9,7 @@ use Exporter 'import';
 use Log::Any qw/$log/;
 use Data::Dumper;
 
-our $VERSION = '0.08'; # VERSION
+our $VERSION = '0.09'; # VERSION
 # CONTRIBUTORS
 
 our @EXPORT_OK = qw/whoami whowasi traceAndUnpack/;
@@ -66,7 +66,7 @@ MarpaX::Languages::C::AST::Util - C Translation to AST - Class method utilities
 
 =head1 VERSION
 
-version 0.08
+version 0.09
 
 =head1 SYNOPSIS
 

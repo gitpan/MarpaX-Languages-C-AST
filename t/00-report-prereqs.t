@@ -11,7 +11,6 @@ use List::Util qw/max/;
 
 my @modules = qw(
   Carp
-  Class::Runtime
   Data::Dumper
   Exporter
   ExtUtils::MakeMaker
@@ -27,7 +26,6 @@ my @modules = qw(
   diagnostics
   perl
   strict
-  tainting
   warnings
 );
 

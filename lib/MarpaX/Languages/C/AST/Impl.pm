@@ -14,7 +14,7 @@ use constant {LATEST_G1_EARLEY_SET_ID => -1};
 use constant {DOT_PREDICTION => 0, DOT_COMPLETION => -1};
 use Exporter 'import';
 
-our $VERSION = '0.08'; # VERSION
+our $VERSION = '0.09'; # VERSION
 
 our @EXPORT_OK = qw/DOT_PREDICTION DOT_COMPLETION LATEST_G1_EARLEY_SET_ID/;
 
@@ -384,7 +384,7 @@ MarpaX::Languages::C::AST::Impl - Implementation of Marpa's interface
 
 =head1 VERSION
 
-version 0.08
+version 0.09
 
 =head1 SYNOPSIS
 

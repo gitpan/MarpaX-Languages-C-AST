@@ -5,7 +5,7 @@ package MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011;
 
 # ABSTRACT: ISO ANSI C 2011 grammar written in Marpa BNF
 
-our $VERSION = '0.08'; # VERSION
+our $VERSION = '0.09'; # VERSION
 
 
 sub new {
@@ -51,7 +51,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011 - ISO ANSI C 2011 grammar wr
 
 =head1 VERSION
 
-version 0.08
+version 0.09
 
 =head1 SYNOPSIS
 

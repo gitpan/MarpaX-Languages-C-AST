@@ -21,7 +21,6 @@ my %WriteMakefileArgs = (
   "NAME" => "MarpaX::Languages::C::AST",
   "PREREQ_PM" => {
     "Carp" => 0,
-    "Class::Runtime" => 0,
     "Data::Dumper" => 0,
     "Exporter" => 0,
     "Log::Any" => 0,
@@ -38,10 +37,9 @@ my %WriteMakefileArgs = (
     "File::Spec::Functions" => 0,
     "File::Temp" => 0,
     "List::Util" => 0,
-    "Test::More" => 0,
-    "tainting" => 0
+    "Test::More" => 0
   },
-  "VERSION" => "0.08",
+  "VERSION" => "0.09",
   "test" => {
     "TESTS" => "t/*.t"
   }
