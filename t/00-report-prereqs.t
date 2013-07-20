@@ -11,19 +11,33 @@ use List::Util qw/max/;
 
 my @modules = qw(
   Carp
+  Class::Struct
+  Config
   Data::Dumper
   Exporter
   ExtUtils::MakeMaker
+  File::Basename
   File::Find
   File::Spec::Functions
   File::Temp
+  Getopt::Long
+  IO::Handle
+  IPC::Run
   List::Util
   Log::Any
+  Log::Any::Adapter
+  Log::Log4perl
   Marpa::R2
+  POSIX
+  SUPER
+  Scalar::Util
   Storable
+  Term::ProgressBar
   Test::More
+  Test::Trap
   constant
   diagnostics
+  parent
   perl
   strict
   warnings

@@ -7,33 +7,52 @@ package MarpaX::Languages::C::AST;
 
 use Log::Any qw/$log/;
 use Carp qw/croak/;
-use MarpaX::Languages::C::AST::Grammar;
-use MarpaX::Languages::C::AST::Impl qw/DOT_COMPLETION DOT_PREDICTION/;
-use MarpaX::Languages::C::AST::Scope;
+use MarpaX::Languages::C::AST::Util qw/:all/;
+use MarpaX::Languages::C::AST::Grammar qw//;
+use MarpaX::Languages::C::AST::Impl qw//;
+use MarpaX::Languages::C::AST::Scope qw//;
+use MarpaX::Languages::C::AST::Callback::Events qw//;
 
-our $VERSION = '0.09'; # VERSION
+our $VERSION = '0.10'; # VERSION
 
 
+# ----------------------------------------------------------------------------------------
 sub new {
-  my ($class, $grammarName) = @_;
+  my ($class, %opts) = @_;
 
-  $grammarName //= 'ISO-ANSI-C-2011';
+  my $grammarName = $opts{grammarName} || 'ISO-ANSI-C-2011';
 
-  my $self  = {};
-  $self->{_scope} = MarpaX::Languages::C::AST::Scope->new(),
-    $self->{_grammar} = MarpaX::Languages::C::AST::Grammar->new($grammarName);
-
-  my $grammar_option = $self->{_grammar}->grammar_option();
+  my $grammar = MarpaX::Languages::C::AST::Grammar->new($grammarName);
+  my $grammar_option = $grammar->grammar_option();
   $grammar_option->{bless_package} = 'C::AST';
-  $grammar_option->{source} = \$self->{_grammar}->content();
+  $grammar_option->{source} = \$grammar->content();
+  my $recce_option = $grammar->recce_option();
 
-  my $recce_option = $self->{_grammar}->recce_option();
+  my $lexemeCallback = $opts{lexemeCallback} || '';
+  my @lexemeCallbackArgs = ();
+  if ($opts{lexemeCallback}) {
+      if (ref($opts{lexemeCallback}) ne 'ARRAY') {
+	  croak 'lexemeCallback option must be an ARRAY reference';
+      }
+      if (! @{$opts{lexemeCallback}}) {
+	  croak 'lexemeCallback is a reference to an empty array';
+      }
+      if (ref($opts{lexemeCallback}->[0]) ne 'CODE') {
+	  croak 'lexemeCallback must start with a CODE reference';
+      }
+      @lexemeCallbackArgs = @{$opts{lexemeCallback}};
+      $lexemeCallback = shift(@lexemeCallbackArgs);
+  }
 
-  $self->{_impl} = MarpaX::Languages::C::AST::Impl->new($grammar_option, $recce_option);
-  $self->{_nbTypedef} = 0;               # Number of TYPEDEF
-  $self->{_nbParameterTypeList} = 0;     # Number of parameterTypeList
-  $self->{_nbStructDeclarationList} = 0; # Number of structDeclarationList
-  $self->{_identifier} = '';             # Last lexeme action if it pushed an identifier - could have been done via an event on a new rule like e.g. directDeclaratorIdentifier ::= IDENTIFIER
+  my $self  = {
+               _scope              => MarpaX::Languages::C::AST::Scope->new(),
+               _grammar            => $grammar,
+               _impl               => MarpaX::Languages::C::AST::Impl->new($grammar_option, $recce_option),
+               _sourcep            => undef,
+	       _lexemeCallback     => $lexemeCallback,
+	       _lexemeCallbackArgs => \@lexemeCallbackArgs,
+	       _logInfo            => $opts{logInfo} || 0
+              };
 
   bless($self, $class);
 
@@ -41,68 +60,29 @@ sub new {
 }
 
 
+# ----------------------------------------------------------------------------------------
 sub parse {
-  my ($self, $referenceToSourceCodep, $optionalArrayOfValuesb) = @_;
+  my ($self, $sourcep, $optionalArrayOfValuesb) = @_;
 
-  my $max = length(${$referenceToSourceCodep});
-  my $pos = $self->{_impl}->read($referenceToSourceCodep);
+  $self->{_sourcep} = $sourcep;
+  $self->{_callbackEvents} = MarpaX::Languages::C::AST::Callback::Events->new($self);
+
+  my $max = length(${$sourcep});
+  my $pos = $self->{_impl}->read($sourcep);
   do {
-    $self->_doEvent();
-    $self->_doLexeme();
+    my %lexeme = ();
+    $self->_getLexeme(\%lexeme);
+    $self->_doScope(\%lexeme);
+    $self->_doEvents();
+    $self->_doPauseAfterLexeme(\%lexeme);
+    $self->_doLogInfo(\%lexeme);
+    $self->_doLexemeCallback(\%lexeme);
   } while (($pos = $self->{_impl}->resume()) < $max);
 
   return($self->_value($optionalArrayOfValuesb));
 }
 
-#
-# INTERNAL METHODS
-#
-
-######################
-# _nbParameterTypeList
-######################
-sub _nbParameterTypeList {
-    my ($self, $context, $inc) = @_;
-
-    if (defined($inc)) {
-	$self->{_nbParameterTypeList} += $inc;
-    } else {
-	$self->{_nbParameterTypeList} = 0;
-    }
-    $log->debugf('[%s] _nbParameterTypeList is now %d', $context, $self->{_nbParameterTypeList});
-}
-
-##########################
-# _nbStructDeclarationList
-##########################
-sub _nbStructDeclarationList {
-    my ($self, $context, $inc) = @_;
-
-    if (defined($inc)) {
-	$self->{_nbStructDeclarationList} += $inc;
-    } else {
-	$self->{_nbStructDeclarationList} = 0;
-    }
-    $log->debugf('[%s] _nbStructDeclarationList is now %d', $context, $self->{_nbStructDeclarationList});
-}
-
-############
-# _nbTypedef
-############
-sub _nbTypedef {
-    my ($self, $context, $inc) = @_;
-
-    if (defined($inc)) {
-	$self->{_nbTypedef} += $inc;
-    } else {
-	$self->{_nbTypedef} = 0;
-    }
-    $log->debugf('[%s] _nbTypedef is now %d', $context, $self->{_nbTypedef});
-}
-
-#######################
-# _show_last_expression
-#######################
+# ----------------------------------------------------------------------------------------
 sub _show_last_expression {
   my ($self) = @_;
 
@@ -111,10 +91,7 @@ sub _show_last_expression {
   my $lastExpression = $self->{_impl}->range_to_string($start, $end);
   return "Last expression successfully parsed was: $lastExpression";
 }
-
-########
-# _value
-########
+# ----------------------------------------------------------------------------------------
 sub _value {
   my ($self, $arrayOfValuesb) = @_;
 
@@ -122,7 +99,7 @@ sub _value {
 
   my @rc = ();
   my $nvalue = 0;
-  my $valuep = $self->{_impl}->value() || croak $self->_show_last_expression();
+  my $valuep = $self->{_impl}->value() || logCroak('%s', $self->_show_last_expression());
   if (defined($valuep)) {
     push(@rc, $valuep);
   }
@@ -134,7 +111,7 @@ sub _value {
     }
   } while (defined($valuep));
   if ($#rc != 0 && ! $arrayOfValuesb) {
-    croak 'Number of parse tree value should be 1';
+    logCroak('Number of parse tree value should be %d', 1);
   }
   if ($arrayOfValuesb) {
     return [ @rc ];
@@ -142,241 +119,164 @@ sub _value {
     return $rc[0];
   }
 }
+# ----------------------------------------------------------------------------------------
+sub _doEvents {
+  my $self = shift;
 
-##########
-# _doEvent
-##########
-sub _doEvent {
-  my ($self) = @_;
-
-  #
-  ## List of events of interest
-  #
-  my %event = (
-               initDeclaratorList => 0,
-               parameterDeclaration => 0,
-               declaration => 0,
-               functionDefinition => 0,
-               enumerationConstant => 0,
-               primaryExpression => 0
-              );
-
+  my %events = ();
   my $iEvent = 0;
-  my $hasEvent = 0;
   while (defined($_ = $self->{_impl}->event($iEvent++))) {
-    ++$hasEvent;
-    ++$event{$_->[0]} if (exists($event{$_->[0]}));
+    ++$events{$_->[0]};
   }
-  return if (! $hasEvent);
 
-  $log->debugf('<Events %s>', join(',', sort grep {$event{$_}} keys %event));
+  if (%events) {
+    my @events = keys %events;
+    $log->debugf('[%s] Events: %s', whoami(__PACKAGE__), \@events);
+    $self->{_callbackEvents}->exec(@events);
+  }
+}
+# ----------------------------------------------------------------------------------------
+sub _getLexeme {
+  my ($self, $lexemeHashp) = @_;
 
-  # ---------------------------------------
-  # Enter/Obscure typedef-name in namespace
-  # ---------------------------------------
-  if ($event{initDeclaratorList} && $self->{_identifier}) {
-    my $event = 'initDeclaratorList';
-    if ($self->_canEnterTypedef($event)) {
-      if ($self->{_nbTypedef} > 0) {
-        $self->{_scope}->parseEnterTypedef($event, $self->{_identifier});
+  #
+  # Get paused "before" lexeme
+  #
+  my $lexeme = $self->{_impl}->pause_lexeme();
+  if (defined($lexeme)) {
+    $lexemeHashp->{name} = $lexeme;
+    ($lexemeHashp->{start}, $lexemeHashp->{length}) = $self->{_impl}->pause_span();
+    ($lexemeHashp->{line}, $lexemeHashp->{column}) = $self->{_impl}->line_column($lexemeHashp->{start});
+    $lexemeHashp->{value} = $self->{_impl}->literal($lexemeHashp->{start}, $lexemeHashp->{length});
+  }
+}
+# ----------------------------------------------------------------------------------------
+sub _doLogInfo {
+  my ($self, $lexemeHashp) = @_;
+
+  if ($self->{_logInfo} && exists($lexemeHashp->{name})) {
+    $log->infof("[%8d:%3d] %-30s %s", $lexemeHashp->{line}, $lexemeHashp->{column}, $lexemeHashp->{name}, $lexemeHashp->{value});
+  }
+}
+# ----------------------------------------------------------------------------------------
+sub _doLexemeCallback {
+  my ($self, $lexemeHashp) = @_;
+
+  if ($self->{_lexemeCallback} && exists($lexemeHashp->{name})) {
+      my $callback = $self->{_lexemeCallback};
+      &$callback(@{$self->{_lexemeCallbackArgs}}, $lexemeHashp);
+  }
+}
+# ----------------------------------------------------------------------------------------
+sub _doScope {
+  my ($self, $lexemeHashp) = @_;
+
+  #
+  # Get paused lexeme
+  #
+  if (exists($lexemeHashp->{name})) {
+
+    my $lexemeFormatString = "%s \"%s\" at position %d:%d";
+    my @lexemeCommonInfo = ($lexemeHashp->{name}, $lexemeHashp->{value}, $lexemeHashp->{line}, $lexemeHashp->{column});
+
+    if (defined($self->{_callbackEvents}->topic_fired_data('fileScopeDeclarator'))) {
+      if ($self->{_callbackEvents}->topic_fired_data('fileScopeDeclarator')->[0] == -1) {
+        #
+        # This will be for next round.
+        #
+        $log->debugf('[%s] fileScopeDeclarator: flagging lookup required at next round.', whoami(__PACKAGE__));
+        $self->{_callbackEvents}->topic_fired_data('fileScopeDeclarator')->[0] = 1;
+
+      } elsif ($self->{_callbackEvents}->topic_fired_data('fileScopeDeclarator')->[0] == 1) {
+        #
+        # Lookup what follows the file-scope declarator
+        #
+        if ($lexemeHashp->{name} ne 'COMMA' &&
+            $lexemeHashp->{name} ne 'SEMICOLON' &&
+            $lexemeHashp->{name} ne 'EQUAL') {
+          $log->debugf('[%s] fileScopeDeclarator: next lexeme is %s, flagging reenterScope.', whoami(__PACKAGE__), $lexemeHashp->{name});
+          $self->{_callbackEvents}->topic_fired_data('reenterScope')->[0] = 1;
+        }
+        #
+        # Flag lookup done
+        #
+        $log->debugf('[%s] fileScopeDeclarator: flagging lookup done.', whoami(__PACKAGE__));
+        $self->{_callbackEvents}->topic_fired_data('fileScopeDeclarator')->[0] = 0;
+      }
+    }
+
+    if ($lexemeHashp->{name} eq 'LCURLY_SCOPE' || $lexemeHashp->{name} eq 'LPAREN_SCOPE') {
+      $log->debugf('[%s] $lexemeFormatString: entering scope.', whoami(__PACKAGE__), @lexemeCommonInfo);
+      $self->{_scope}->parseEnterScope();
+    } elsif ($lexemeHashp->{name} eq 'RCURLY_SCOPE' || $lexemeHashp->{name} eq 'RPAREN_SCOPE') {
+      if ($self->{_scope}->parseScopeLevel == 1) {
+        $log->debugf('[%s] $lexemeFormatString: delay leaving scope.', whoami(__PACKAGE__), @lexemeCommonInfo);
+        $self->{_scope}->parseExitScope(0);
       } else {
-        $self->{_scope}->parseObscureTypedef($event, $self->{_identifier});
+        $log->debugf('[%s] $lexemeFormatString: immediate leaving scope.', whoami(__PACKAGE__), @lexemeCommonInfo);
+        $self->{_scope}->parseExitScope(1);
+      }
+    } else {
+      $log->debugf('[%s] $lexemeFormatString.', whoami(__PACKAGE__), @lexemeCommonInfo);
+      if ($self->{_scope}->parseScopeLevel == 1 && $self->{_scope}->parseDelay) {
+        if (defined($self->{_callbackEvents}->topic_fired_data('reenterScope')) &&
+            $self->{_callbackEvents}->topic_fired_data('reenterScope')->[0]) {
+          $log->debugf('[%s] reenterScope flag is on at scope 1.', whoami(__PACKAGE__));
+          $self->{_scope}->parseReenterScope();
+          $log->debugf('[%s] Unflagging reenterScope.', whoami(__PACKAGE__));
+          $self->{_callbackEvents}->topic_fired_data('reenterScope')->[0] = 0;
+        } else {
+          $log->debugf('[%s] reenterScope flag is off at scope 1.', whoami(__PACKAGE__));
+          $self->{_scope}->doExitScope();
+        }
       }
     }
   }
-
-  # ----------
-  # Enter enum
-  # ----------
-  if ($event{enumerationConstant}) {
-      my $event = 'enumerationConstant';
-    #
-    # Enum is not scope dependend - from now on it obscures any use of its
-    # identifier in any scope
-    #
-    my $enumerationConstant = $self->{_impl}->substring($self->{_impl}->last_completed('enumerationConstant'));
-    $self->{_scope}->parseEnterEnum($event, $enumerationConstant);
-  }
-
-  # ----------------------------------------------------------------------------------
-  # parameterDeclaration, declaration, functionDefinition: reset the number of TYPEDEF
-  # ----------------------------------------------------------------------------------
-  if ($event{parameterDeclaration} || $event{declaration} || $event{functionDefinition}) {
-    my $event = join(',', sort grep {$event{$_}} qw/parameterDeclaration declaration functionDefinition/);
-    $self->_nbTypedef($event, undef);
-  }
-
-  # -----------------------------------
-  # primaryExpression: anything to do ?
-  # -----------------------------------
-  if ($event{primaryExpression}) {
-  }
 }
+# ----------------------------------------------------------------------------------------
+sub _doPauseAfterLexeme {
+  my ($self, $lexemeHashp) = @_;
 
-####################
-# _expectTypedefName
-####################
-sub _expectTypedefName {
-  my ($self, $context) = @_;
-  my $rc = $self->{_impl}->findInProgressShort(DOT_PREDICTION, 'typeSpecifier', [ 'TYPEDEF_NAME' ]);
-  $log->debugf('[%s] Expecting TYPEDEF_NAME? %s', $context, $rc ? 'yes' : 'no');
-  return $rc;
-}
-
-#############
-# _expectEnum
-#############
-sub _expectEnum {
-  my ($self, $context) = @_;
-  my $rc = $self->{_impl}->findInProgressShort(DOT_PREDICTION, 'constant', [ 'ENUMERATION_CONSTANT' ]);
-  $log->debugf('[%s] Expecting ENUMERATION_CONSTANT? %s', $context, $rc ? 'yes' : 'no');
-  return $rc;
-}
-
-###########
-# _doLexeme
-###########
-sub _doLexeme {
-  my ($self) = @_;
-
-  $self->{_identifier} = '';
-
-  my $lexeme = $self->{_impl}->pause_lexeme();
-  if (! defined($lexeme)) {
-    return;
-  }
-
-  $log->debugf('<Lexeme %s>', $lexeme);
-
-  # -------------------------------------------------------------------------
-  # Lexemes "before" pause: IDENTIFIER, TYPEDEF_NAME and ENUMERATION_CONSTANT
-  # -------------------------------------------------------------------------
-  if (grep {$lexeme eq $_} qw/IDENTIFIER TYPEDEF_NAME ENUMERATION_CONSTANT/) {
+  #
+  # Get paused lexeme
+  #
+  if (exists($lexemeHashp->{name})) {
       #
-      # Determine the correct lexeme
+      # pause start lexemes
       #
-      my ($lexeme_start, $lexeme_length) = $self->{_impl}->pause_span();
-      my $lexeme_value = $self->{_impl}->literal($lexeme_start, $lexeme_length);
-      my $context = sprintf('%s "%s"?', $lexeme, $lexeme_value);
-      #
-      # All parse symbol activity must be suspended when in the context of a structDeclarator
-      #
-      my $newlexeme;
-      if ($self->_expectTypedefName($context) && $self->_canEnterTypedefName($context) && $self->{_scope}->parseIsTypedef($context, $lexeme_value)) {
-	  $newlexeme = 'TYPEDEF_NAME';
+      if ($lexemeHashp->{name} eq 'TYPEDEF_NAME' ||
+          $lexemeHashp->{name} eq 'ENUMERATION_CONSTANT' ||
+          $lexemeHashp->{name} eq 'IDENTIFIER') {
+	  my @terminals_expected = @{$self->{_impl}->terminals_expected()};
+	  #
+	  # Determine the correct lexeme
+	  #
+	  my $newlexeme;
+	  if ((grep {$_ eq 'TYPEDEF_NAME'} @terminals_expected) && $self->{_scope}->parseIsTypedef($lexemeHashp->{value})) {
+	      $newlexeme = 'TYPEDEF_NAME';
+	  } elsif ((grep {$_ eq 'ENUMERATION_CONSTANT'} @terminals_expected) && $self->{_scope}->parseIsEnum($lexemeHashp->{value})) {
+	      $newlexeme = 'ENUMERATION_CONSTANT';
+	  } elsif ((grep {$_ eq 'IDENTIFIER'} @terminals_expected)) {
+	      $newlexeme = 'IDENTIFIER';
+	  } else {
+	      logCroak('[%s] Lexeme value "%s" cannot be associated to TYPEDEF_NAME, ENUMERATION_CONSTANT nor IDENTIFIER at line %d, column %d', whoami(__PACKAGE__), $lexemeHashp->{value}, $lexemeHashp->{line}, $lexemeHashp->{column});
+	  }
+	  #
+	  # Push the unambiguated lexeme
+	  #
+	  $log->debugf('[%s] Pushing lexeme %s "%s"', whoami(__PACKAGE__), $newlexeme, $lexemeHashp->{value});
+	  if (! defined($self->{_impl}->lexeme_read($newlexeme, $lexemeHashp->{start}, $lexemeHashp->{length}, $lexemeHashp->{value}))) {
+	      logCroak('[%s] Lexeme value "%s" cannot be associated to lexeme name %s at position %d:%d', whoami(__PACKAGE__), $lexemeHashp->{value}, $newlexeme, $lexemeHashp->{line}, $lexemeHashp->{column});
+	  }
+          $lexemeHashp->{name} = $newlexeme;
+	  #
+	  # A lexeme_read() can generate an event
+	  #
+	  $self->_doEvents();
       }
-      elsif ($self->_expectEnum($context) && $self->_canEnterEnumerationConstant($context) && $self->{_scope}->parseIsEnum($context, $lexeme_value)) {
-	  $newlexeme = 'ENUMERATION_CONSTANT';
-      }
-      else {
-	  $newlexeme = 'IDENTIFIER';
-	  $self->{_identifier} = $lexeme_value;
-      }
-      #
-      # Push the unambiguated lexeme
-      #
-      $log->debugf('[%s] Pushing lexeme %s', $context, $newlexeme);
-      if (! defined($self->{_impl}->lexeme_read($newlexeme, $lexeme_start, $lexeme_length, $lexeme_value))) {
-	  my ($line, $column) = $self->{_impl}->line_column($lexeme_start);
-	  my $msg = sprintf('[%s] Error at line %d, column %d: "%s" cannot be associated to lexeme %s', $context, $line, $column, $lexeme_value, $newlexeme);
-	  $log->fatalf($msg);
-	  croak $msg;
-      }
-      #
-      # A lexeme_read() can generate an event
-      #
-      $self->_doEvent();
-  }
-  # -----------------------------------------------------------
-  # Lexemes "after" pause: Scope management, Context management
-  # -----------------------------------------------------------
-  else {
-      my $context = $lexeme;
-      # ----------------
-      # Scope management
-      # ----------------
-      #
-      # Enter/Reenter
-      #
-      if    ($lexeme eq 'LPAREN_PARAMETER')             {  $self->{_scope}->parseEnterScope($context); }
-      elsif ($lexeme eq 'LPAREN_IDENTIFIERLIST')        {  $self->{_scope}->parseEnterScope($context); }
-      elsif ($lexeme eq 'LCURLY_COMPOUNDSTATEMENT')     {$self->_canReenterScope() ?
-                                                           $self->{_scope}->parseReenterScope($context) :
-                                                           $self->{_scope}->parseEnterScope($context); }
-      #
-      # Exit
-      #
-      if    ($lexeme eq 'RPAREN_PARAMETER')             { $self->{_scope}->parseExitScope($context); }
-      elsif ($lexeme eq 'RPAREN_IDENTIFIERLIST')        { $self->{_scope}->parseExitScope($context); }
-      elsif ($lexeme eq 'RCURLY_COMPOUNDSTATEMENT')     { $self->{_scope}->parseExitScope($context); }
-      # ------------------
-      # Context management
-      # ------------------
-      if    ($lexeme eq 'LPAREN_PARAMETER')             { $self->_nbParameterTypeList($context, 1);      }
-      elsif ($lexeme eq 'RPAREN_PARAMETER')             { $self->_nbParameterTypeList($context, -1);     }
-      elsif ($lexeme eq 'LCURLY_STRUCTDECLARATIONLIST') { $self->_nbStructDeclarationList($context, 1);  }
-      elsif ($lexeme eq 'RCURLY_STRUCTDECLARATIONLIST') { $self->_nbStructDeclarationList($context, -1); }
-      elsif ($lexeme eq 'TYPEDEF')                      { $self->_nbTypedef($context, 1);                }
   }
 }
 
-######################
-# _canEnterTypedefName
-######################
-sub _canEnterTypedefName {
-  my ($self, $context) = @_;
-
-  my $rc = 1;
-  if ($self->{_nbParameterTypeList} > 0) {
-    #
-    # In parameterDeclaration a typedef-name cannot be entered.
-    #
-    $log->debugf('[%s] parameterDeclaration context: a typedef-name cannot be entered', $context);
-    $rc = 0;
-  }
-
-  return($rc);
-}
-
-##################
-# _canEnterTypedef
-##################
-sub _canEnterTypedef {
-  my ($self, $context) = @_;
-
-  my $rc = 1;
-  if ($self->{_nbStructDeclarationList} > 0) {
-    #
-    # In structDeclaratorparameterDeclaration a typedef-name cannot be entered.
-    #
-    $log->debugf('[%s] structDeclarationList context: parse symbol activity is suspended', $context);
-    $rc = 0;
-  }
-
-  return($rc);
-}
-
-##############################
-# _canEnterEnumerationConstant
-##############################
-sub _canEnterEnumerationConstant {
-  my ($self, $context) = @_;
-
-  my $rc = 1;
-  $log->debugf('[%s] enumeration constant can be entered', $context);
-
-  return($rc);
-}
-
-##################
-# _canReenterScope
-##################
-sub _canReenterScope {
-  my ($self) = @_;
-
-  return ($self->{_impl}->findInProgressShort(-2, 3, 'functionDefinition', [ 'declarationSpecifiers', 'declarator', 'declarationList', 'compoundStatement' ]) ||
-          $self->{_impl}->findInProgressShort(-2, 2, 'functionDefinition', [ 'declarationSpecifiers', 'declarator', 'compoundStatement' ]));
-}
 
 1;
 
@@ -392,7 +292,7 @@ MarpaX::Languages::C::AST - Translate a C source to an AST
 
 =head1 VERSION
 
-version 0.09
+version 0.10
 
 =head1 SYNOPSIS
 
@@ -424,23 +324,73 @@ version 0.09
     x1 x;
     ';
     my $cAstObject = MarpaX::Languages::C::AST->new();
-    print Dumper($cAstObject->parse(\$cSourceCode));
+    $log->infof('%s', $cAstObject->parse(\$cSourceCode));
 
 =head1 DESCRIPTION
 
-This modules translates a C source into an AST tree. The AST consist of blessed objects that map exactly to the C grammar in use. If you want to enable logging, be aware that this module is a Log::Any thingy.
+This module translates C source into an AST tree. To assist further process of the AST tree, the nodes of the AST are blessed according to the C grammar you have selected. (The default is 'ISO-ANSI-C-2011'.) If you want to enable logging, be aware that this module is a Log::Any thingy.
 
-Please note that this module just I<translates> a C source, it does I<not> check for its correctness, i.e. the numerous grammar constraints built on top on the C grammar are not implemented, for example constraint on the number of storage class specifiers, uniqueness of labeled statements within a function, etc.. This is left to a compiler, which is not the goal here. So, to state things clearly, this module is addressing the I<ambiguities> of the grammar itself, i.e. the dangling else, the typedef/enum/identifier. And produces an AST of the parse tree value.
+This module implements the full syntax, as well as those specification constraints which are syntactic in nature: Associativity of nested if-then-else statements is according to the C standards, as is the treatment of names as typedefs, enums, or variable identifiers.
+
+The C standards contain many constraints that are non-syntactic. MarpaX::Languages::C::AST does not implement these, leaving them for AST post-process. One example of a non-syntactic constraint is the requirement that labeled statements within a function be unique. Another is the requirement that declarations include at most one storage class specifier.
 
 =head1 SUBROUTINES/METHODS
 
-=head2 new($class, $grammarName)
+=head2 new($class, %options)
 
-Instantiate a new object. Takes as parameter an optional base name of a grammar. Default is 'ISO-ANSI-C-2011'.
+Instantiate a new object. Takes as parameter an optional hash of options that can be:
 
-=head2 parse($self, $referenceToSourceCodep, $optionalArrayOfValuesb)
+=over
+
+=item grammarName
+
+Name of a grammar. Default is 'ISO-ANSI-C-2011'.
+
+=item logInfo
+
+Issue logging with level 'info' for every found lexeme. Default is 0 (i.e. false). Please note that logging is done through Log::Any.
+
+=item lexemeCallback
+
+Array reference containing a CODE ref and optional arguments. This callback will be trigerred like this: &$CODE(@arguments, $lexemeHashp), where $lexemeHashp is a reference to a hash describing current lexeme:
+
+=over
+
+=item name
+
+Name of the lexeme. You have to refer to the grammar used to get its definition, although this is usually self-explanatory.
+
+=item start
+
+G1 (Marpa term) start location.
+
+=item length
+
+Length of the lexeme
+
+=item line
+
+Line number in the source being parsed.
+
+=item column
+
+Column number in the source being parsed.
+
+=item value
+
+String containing lexeme value.
+
+=back
+
+=back
+
+=head2 parse($self, $sourcep, $optionalArrayOfValuesb)
 
 Do the parsing and return the blessed value. Takes as first parameter the reference to a C source code. Takes as optional second parameter a flag saying if the return value should be an array of all values or not. If this flag is false, the module will croak if there more than one parse tree value.
+
+=head1 SEE ALSO
+
+L<Log::Any>, L<Marpa::R2>
 
 =for :stopwords cpan testmatrix url annocpan anno bugtracker rt cpants kwalitee diff irc mailto metadata placeholders metacpan
 
@@ -464,6 +414,20 @@ L<https://github.com/jddurand/marpax-languages-c-ast>
 =head1 AUTHOR
 
 Jean-Damien Durand <jeandamiendurand@free.fr>
+
+=head1 CONTRIBUTORS
+
+=over 4
+
+=item *
+
+Jeffrey Kegler <jkegl@cpan.org>
+
+=item *
+
+jddurand <jeandamiendurand@free.fr>
+
+=back
 
 =head1 COPYRIGHT AND LICENSE
 

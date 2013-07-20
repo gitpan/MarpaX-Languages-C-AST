@@ -16,18 +16,33 @@ my %WriteMakefileArgs = (
     "ExtUtils::MakeMaker" => "6.30"
   },
   "DISTNAME" => "MarpaX-Languages-C-AST",
-  "EXE_FILES" => [],
+  "EXE_FILES" => [
+    "bin/c2ast.pl"
+  ],
   "LICENSE" => "perl",
   "NAME" => "MarpaX::Languages::C::AST",
   "PREREQ_PM" => {
     "Carp" => 0,
+    "Class::Struct" => 0,
+    "Config" => 0,
     "Data::Dumper" => 0,
     "Exporter" => 0,
+    "File::Basename" => 0,
+    "Getopt::Long" => 0,
+    "IO::Handle" => 0,
+    "IPC::Run" => 0,
     "Log::Any" => 0,
-    "Marpa::R2" => "2.056000",
+    "Log::Any::Adapter" => 0,
+    "Log::Log4perl" => 0,
+    "Marpa::R2" => "2.064000",
+    "POSIX" => 0,
+    "SUPER" => 0,
+    "Scalar::Util" => 0,
     "Storable" => 0,
+    "Term::ProgressBar" => 0,
     "constant" => 0,
     "diagnostics" => 0,
+    "parent" => 0,
     "strict" => 0,
     "warnings" => 0
   },
@@ -37,9 +52,10 @@ my %WriteMakefileArgs = (
     "File::Spec::Functions" => 0,
     "File::Temp" => 0,
     "List::Util" => 0,
-    "Test::More" => 0
+    "Test::More" => 0,
+    "Test::Trap" => 0
   },
-  "VERSION" => "0.09",
+  "VERSION" => "0.10",
   "test" => {
     "TESTS" => "t/*.t"
   }
