@@ -13,7 +13,7 @@ use MarpaX::Languages::C::AST::Impl qw//;
 use MarpaX::Languages::C::AST::Scope qw//;
 use MarpaX::Languages::C::AST::Callback::Events qw//;
 
-our $VERSION = '0.11'; # VERSION
+our $VERSION = '0.12'; # VERSION
 
 
 # ----------------------------------------------------------------------------------------
@@ -304,7 +304,7 @@ MarpaX::Languages::C::AST - Translate a C source to an AST
 
 =head1 VERSION
 
-version 0.11
+version 0.12
 
 =head1 SYNOPSIS
 

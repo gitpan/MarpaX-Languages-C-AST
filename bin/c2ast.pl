@@ -21,7 +21,7 @@ autoflush STDOUT 1;
 
 # ABSTRACT: C source analysis
 
-our $VERSION = '0.11'; # VERSION
+our $VERSION = '0.12'; # VERSION
 
 # PODNAME: c2ast.pl
 
@@ -83,10 +83,18 @@ run(\@cmd, \undef, \$preprocessedOutput);
 # -----------------
 my %lexemeCallbackHash = (file => $cppfile,
 			  lexeme => {},
+			  internalLexeme => {},
 			  progress => undef,
 			  position2line => {},
 			  next_progress => 0,
 			  allfiles => {});
+
+my %check = ();
+map {++$check{$_}} @check;
+if (exists($check{reservedNames})) {
+    # Force IDENTIFIER internal survey
+    $lexemeCallbackHash{internalLexeme}->{IDENTIFIER} = 1;
+}
 
 if ($progress) {
   #
@@ -115,8 +123,6 @@ if ($progress) {
 # --------------
 # Postprocessing
 # --------------
-my %check = ();
-map {++$check{$_}} @check;
 check(\%check, \%lexemeCallbackHash, $bless);
 
 # ----
@@ -240,13 +246,16 @@ sub lexemeCallback {
 	}
     }
 
-    if (exists($lexemeCallbackHashp->{lexeme}->{$lexemeHashp->{name}})) {
+    if (exists($lexemeCallbackHashp->{lexeme}->{$lexemeHashp->{name}}) ||
+	exists($lexemeCallbackHashp->{internalLexeme}->{$lexemeHashp->{name}})) {
 	if (defined($lexemeCallbackHashp->{file}) &&
 	    $lexemeCallbackHashp->{file} eq $lexemeCallbackHashp->{curfile}) {
 	    my $line = $lexemeCallbackHashp->{curline} + ($lexemeHashp->{line} - $lexemeCallbackHashp->{curline_real} - 1);
 	    $lexemeCallbackHashp->{position2line}->{$lexemeHashp->{start}} = $line;
-	    my $tryToAlign = sprintf('%s(%d)', $lexemeCallbackHashp->{curfile}, $line);
-	    printf "%-*s %-30s %s\n", $lexemeCallbackHashp->{tryToAlignMax}, $tryToAlign, $lexemeHashp->{name}, $lexemeHashp->{value};
+	    if (exists($lexemeCallbackHashp->{lexeme}->{$lexemeHashp->{name}})) {
+		my $tryToAlign = sprintf('%s(%d)', $lexemeCallbackHashp->{curfile}, $line);
+		printf "%-*s %-30s %s\n", $lexemeCallbackHashp->{tryToAlignMax}, $tryToAlign, $lexemeHashp->{name}, $lexemeHashp->{value};
+	    }
 	}
     }
 
@@ -317,7 +326,7 @@ c2ast.pl - C source analysis
 
 =head1 VERSION
 
-version 0.11
+version 0.12
 
 =head1 AUTHOR
 
