@@ -10,7 +10,7 @@ use Log::Any qw/$log/;
 use Data::Dumper;
 use Carp qw/croak/;
 
-our $VERSION = '0.10'; # VERSION
+our $VERSION = '0.11'; # VERSION
 # CONTRIBUTORS
 
 our @EXPORT_OK = qw/whoami whowasi traceAndUnpack logCroak showLineAndCol lineAndCol lastCompleted/;
@@ -112,7 +112,7 @@ MarpaX::Languages::C::AST::Util - C Translation to AST - Class method utilities
 
 =head1 VERSION
 
-version 0.10
+version 0.11
 
 =head1 SYNOPSIS
 

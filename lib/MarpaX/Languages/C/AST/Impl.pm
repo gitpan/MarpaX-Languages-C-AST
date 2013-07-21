@@ -10,7 +10,7 @@ use Marpa::R2 2.064000;
 use Carp qw/croak/;
 use MarpaX::Languages::C::AST::Impl::Logger;
 
-our $VERSION = '0.10'; # VERSION
+our $VERSION = '0.11'; # VERSION
 
 our $MARPA_TRACE_FILE_HANDLE;
 our $MARPA_TRACE_BUFFER;
@@ -170,6 +170,13 @@ sub terminals_expected {
   return $self->{recce}->terminals_expected(@_);
 }
 
+
+sub show_progress {
+  my $self = shift;
+
+  return $self->{recce}->show_progress(@_);
+}
+
 1;
 
 __END__
@@ -184,7 +191,7 @@ MarpaX::Languages::C::AST::Impl - Implementation of Marpa's interface
 
 =head1 VERSION
 
-version 0.10
+version 0.11
 
 =head1 SYNOPSIS
 
@@ -267,6 +274,10 @@ Returns Marpa's recognizer's g1_location_to_span for a g1 location $g1.
 =head2 terminals_expected($self)
 
 Returns Marpa's recognizer's terminals_expected.
+
+=head2 show_progress($self)
+
+Returns Marpa's recognizer's show_progress.
 
 =head1 AUTHOR
 

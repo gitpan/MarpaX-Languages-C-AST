@@ -8,7 +8,7 @@ use Carp qw/croak/;
 
 # ABSTRACT: Find data in C AST
 
-our $VERSION = '0.10'; # VERSION
+our $VERSION = '0.11'; # VERSION
 
 
 sub new {
@@ -76,7 +76,7 @@ MarpaX::Languages::C::AST::Util::Data::Find - Find data in C AST
 
 =head1 VERSION
 
-version 0.10
+version 0.11
 
 =head1 SYNOPSIS
 
