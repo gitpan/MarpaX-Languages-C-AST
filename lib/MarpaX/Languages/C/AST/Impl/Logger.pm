@@ -9,7 +9,7 @@ use diagnostics;
 use Carp;
 use Log::Any;
 
-our $VERSION = '0.12'; # VERSION
+our $VERSION = '0.13'; # TRIAL VERSION
 
 sub BEGIN {
     #
@@ -74,7 +74,7 @@ MarpaX::Languages::C::AST::Impl::Logger - Log::Any implementation on top of Marp
 
 =head1 VERSION
 
-version 0.12
+version 0.13
 
 =head1 DESCRIPTION
 

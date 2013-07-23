@@ -10,7 +10,7 @@ use Log::Any qw/$log/;
 use Data::Dumper;
 use Carp qw/croak/;
 
-our $VERSION = '0.12'; # VERSION
+our $VERSION = '0.13'; # TRIAL VERSION
 # CONTRIBUTORS
 
 our @EXPORT_OK = qw/whoami whowasi traceAndUnpack logCroak showLineAndCol lineAndCol lastCompleted/;
@@ -68,7 +68,17 @@ sub logCroak {
 
     my $msg = sprintf($fmt, @arg);
     $log->fatalf($msg);
-    croak $msg;
+    if (! $log->is_fatal()) {
+      #
+      # Logging is not enabled at FATAL level: re do the message in croak
+      #
+      croak $msg;
+    } else {
+      #
+      # Logging is enabled at FATAL level: no new message
+      #
+      croak;
+    }
 }
 
 
@@ -78,7 +88,7 @@ sub showLineAndCol {
     my $pointer = ($col > 0 ? '-' x ($col-1) : '') . '^';
     my $content = (split("\n", ${$sourcep}))[$line-1];
     $content =~ s/\t/ /g;
-    return "$content\n$pointer";
+    return "line:column $line:$col\n\n$content\n$pointer";
 }
 
 
@@ -112,7 +122,7 @@ MarpaX::Languages::C::AST::Util - C Translation to AST - Class method utilities
 
 =head1 VERSION
 
-version 0.12
+version 0.13
 
 =head1 SYNOPSIS
 

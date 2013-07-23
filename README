@@ -2,7 +2,7 @@ NAME
     MarpaX::Languages::C::AST - Translate a C source to an AST
 
 VERSION
-    version 0.12
+    version 0.13
 
 SYNOPSIS
         use strict;
@@ -91,12 +91,17 @@ SUBROUTINES/METHODS
         value
             String containing lexeme value.
 
-  parse($self, $sourcep, $optionalArrayOfValuesb)
-    Do the parsing and return the blessed value. Takes as first parameter
-    the reference to a C source code. Takes as optional second parameter a
-    flag saying if the return value should be an array of all values or not.
-    If this flag is false, the module will croak if there more than one
-    parse tree value.
+  parse($self, $sourcep)
+    Do the parsing. Takes as parameter the reference to a C source code.
+    Returns $self, so that chaining with value method will be natural, i.e.
+    parse()->value().
+
+  value($self, $optionalArrayOfValuesb)
+    Return the blessed value. Takes as optional parameter a flag saying if
+    the return value should be an array of all values or not. If this flag
+    is false, the module will croak if there more than one parse tree value.
+    If this flag is true, a reference to an array of values will be
+    returned, even if there is a single parse tree value.
 
 SEE ALSO
     Log::Any, Marpa::R2

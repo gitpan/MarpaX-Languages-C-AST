@@ -13,7 +13,7 @@ use MarpaX::Languages::C::AST::Impl qw//;
 use MarpaX::Languages::C::AST::Scope qw//;
 use MarpaX::Languages::C::AST::Callback::Events qw//;
 
-our $VERSION = '0.12'; # VERSION
+our $VERSION = '0.13'; # TRIAL VERSION
 
 
 # ----------------------------------------------------------------------------------------
@@ -59,8 +59,20 @@ sub new {
   return $self;
 }
 
-
 # ----------------------------------------------------------------------------------------
+
+sub _context {
+    my $self = shift;
+
+    my $context = $log->is_debug() ?
+	sprintf("\n\nContext:\n\n%s", $self->{_impl}->show_progress()) :
+	'';
+
+    return $context;
+}
+# ----------------------------------------------------------------------------------------
+
+
 sub parse {
   my ($self, $sourcep, $optionalArrayOfValuesb) = @_;
 
@@ -68,41 +80,45 @@ sub parse {
   $self->{_callbackEvents} = MarpaX::Languages::C::AST::Callback::Events->new($self);
 
   my $max = length(${$sourcep});
-  my $pos;
-  eval {$pos = $self->{_impl}->read($sourcep)};
+  my $pos = $[;
+  $self->_doPreprocessing($pos);
+  eval {$pos = $self->{_impl}->read($sourcep, $pos)};
   if ($@) {
       my $line_columnp = lineAndCol($self->{_impl});
-      logCroak("%s\nLast position:\n\n%s\n\nContext:\n\n%s", "$@", showLineAndCol(@{$line_columnp}, $self->{_sourcep}), $self->{_impl}->show_progress());
+      logCroak("%s\nLast position:\n\n%s%s", "$@", showLineAndCol(@{$line_columnp}, $self->{_sourcep}), $self->_context());
   }
   do {
     my %lexeme = ();
     $self->_getLexeme(\%lexeme);
     $self->_doScope(\%lexeme);
     $self->_doEvents();
-    $self->_doPauseAfterLexeme(\%lexeme);
+    $pos += $self->_doPauseLexeme(\%lexeme);
     $self->_doLogInfo(\%lexeme);
     $self->_doLexemeCallback(\%lexeme);
+    $self->_doPreprocessing($pos);
     eval {$pos = $self->{_impl}->resume()};
     if ($@) {
 	my $line_columnp = lineAndCol($self->{_impl});
-	logCroak("%s\nLast position:\n\n%s\n\nContext:\n\n%s", "$@", showLineAndCol(@{$line_columnp}, $self->{_sourcep}), $self->{_impl}->show_progress());
+	logCroak("%s\nLast position:\n\n%s%s", "$@", showLineAndCol(@{$line_columnp}, $self->{_sourcep}), , $self->_context());
     }
   } while ($pos < $max);
 
-  return($self->_value($optionalArrayOfValuesb));
+  return $self;
 }
 
 # ----------------------------------------------------------------------------------------
 sub _show_last_expression {
   my ($self) = @_;
 
-  my ($start, $end) = $self->{_impl}->last_completed_range('translationUnit');
+  my ($start, $end) = $self->{_impl}->last_completed_range('externalDeclaration');
   return 'No expression was successfully parsed' if (! defined($start));
   my $lastExpression = $self->{_impl}->range_to_string($start, $end);
   return "Last expression successfully parsed was: $lastExpression";
 }
 # ----------------------------------------------------------------------------------------
-sub _value {
+
+
+sub value {
   my ($self, $arrayOfValuesb) = @_;
 
   $arrayOfValuesb ||= 0;
@@ -121,7 +137,7 @@ sub _value {
     }
   } while (defined($valuep));
   if ($#rc != 0 && ! $arrayOfValuesb) {
-    logCroak('Number of parse tree value should be %d', 1);
+    logCroak('Number of parse tree value is %d. Should be 1.', scalar(@rc));
   }
   if ($arrayOfValuesb) {
     return [ @rc ];
@@ -178,6 +194,76 @@ sub _doLexemeCallback {
   }
 }
 # ----------------------------------------------------------------------------------------
+sub _doPreprocessing {
+    my ($self, $pos) = @_;
+    #
+    # Until there is MarpaX::Languages::C::Preprocessor, any preprocessing line is
+    # done HERE: embedding the preprocessing grammar IN C grammar is NOT the thing to do.
+    # These are different grammars, different things. Try to do so, and this will cause
+    # a lot of problems, you will see.
+    # It has to be done in a separate phase.
+    # Fortunately the C grammar is doing a pause on EVERY lexeme. So at every pause
+    # (plus the very beginning), we do recognize ourself preprocessor directives.
+    #
+    # And if a preprocessor directive would not follow exactly a lexeme, too bad, we will
+    # not catch it, letting Marpa silently discard it.
+    #
+    my $previous = pos(${$self->{_sourcep}});
+    my $delta = 0;
+    my $line = 0;
+    if ($pos > $[) {
+      my $line_columnp = lineAndCol($self->{_impl});
+      $line = $line_columnp->[0];
+    }
+
+    pos(${$self->{_sourcep}}) = $pos;
+    while (${$self->{_sourcep}} =~ m{\G(\s*^)(\#\s*(\S+)(?:\\.|[^\n])*)(\n|\Z)}smg) {
+	my $start = $-[0];
+	my $length = $+[0] - $-[0];
+	my $match = substr(${$self->{_sourcep}}, $start, $length);
+        my $pre = substr(${$self->{_sourcep}}, $-[1], $+[1] - $-[1]);
+	my $preprocessorDirective = substr(${$self->{_sourcep}}, $-[2], $+[2] - $-[2]);
+	my $directive = substr(${$self->{_sourcep}}, $-[3], $+[3] - $-[3]);
+	my $lastChar = substr(${$self->{_sourcep}}, $-[4], $+[4] - $-[4]);
+	$log->infof('Preprocessor: %s', $preprocessorDirective);
+	#
+	# Last char is newline ?
+	#
+	if (length($lastChar) > 0) {
+	    #
+	    # We unshift so that next match will see this newline.
+	    # This is needed because a preprocessor directive must
+          # start on a fresh new line up to EOF or another newline.
+          # And we used the regexp upper to eat last newline.
+	    my $newPos = pos(${$self->{_sourcep}});
+	    $newPos--;
+	    pos(${$self->{_sourcep}}) = $newPos;
+	    $length--;
+	    substr($match, -1, 1, '');
+	}
+        #
+        # Count the number of newlines we eated in $pre
+        #
+        $line += ($pre =~ tr/\n//);
+	#
+	# If this is a #line, fake an callback event PREPROCESSOR_LINE_DIRECTIVE
+	#
+	if ($directive eq 'line' || $directive =~ /^\d+$/) {
+	    my %lexeme = ();
+	    $lexeme{name} = 'PREPROCESSOR_LINE_DIRECTIVE';
+	    $lexeme{start} = $pos + $delta;
+	    $lexeme{length} = $length;
+	    $lexeme{line} = $line;
+	    $lexeme{column} = -1;       # we do not compute column, but send -1 instead of undef just in case
+	    $lexeme{value} = $match;
+	    $self->_doLexemeCallback(\%lexeme);
+	}
+
+	$delta += $length;
+    }
+    pos(${$self->{_sourcep}}) = $previous;
+}
+# ----------------------------------------------------------------------------------------
 sub _doScope {
   my ($self, $lexemeHashp) = @_;
 
@@ -216,18 +302,18 @@ sub _doScope {
     }
 
     if ($lexemeHashp->{name} eq 'LCURLY_SCOPE' || $lexemeHashp->{name} eq 'LPAREN_SCOPE') {
-      $log->debugf('[%s] $lexemeFormatString: entering scope.', whoami(__PACKAGE__), @lexemeCommonInfo);
+      $log->debugf("[%s] $lexemeFormatString: entering scope.", whoami(__PACKAGE__), @lexemeCommonInfo);
       $self->{_scope}->parseEnterScope();
     } elsif ($lexemeHashp->{name} eq 'RCURLY_SCOPE' || $lexemeHashp->{name} eq 'RPAREN_SCOPE') {
       if ($self->{_scope}->parseScopeLevel == 1) {
-        $log->debugf('[%s] $lexemeFormatString: delay leaving scope.', whoami(__PACKAGE__), @lexemeCommonInfo);
+        $log->debugf("[%s] $lexemeFormatString: delay leaving scope.", whoami(__PACKAGE__), @lexemeCommonInfo);
         $self->{_scope}->parseExitScope(0);
       } else {
-        $log->debugf('[%s] $lexemeFormatString: immediate leaving scope.', whoami(__PACKAGE__), @lexemeCommonInfo);
+        $log->debugf("[%s] $lexemeFormatString: immediate leaving scope.", whoami(__PACKAGE__), @lexemeCommonInfo);
         $self->{_scope}->parseExitScope(1);
       }
     } else {
-      $log->debugf('[%s] $lexemeFormatString.', whoami(__PACKAGE__), @lexemeCommonInfo);
+      $log->debugf("[%s] $lexemeFormatString.", whoami(__PACKAGE__), @lexemeCommonInfo);
       if ($self->{_scope}->parseScopeLevel == 1 && $self->{_scope}->parseDelay) {
         if (defined($self->{_callbackEvents}->topic_fired_data('reenterScope')) &&
             $self->{_callbackEvents}->topic_fired_data('reenterScope')->[0]) {
@@ -244,8 +330,10 @@ sub _doScope {
   }
 }
 # ----------------------------------------------------------------------------------------
-sub _doPauseAfterLexeme {
+sub _doPauseLexeme {
   my ($self, $lexemeHashp) = @_;
+
+  my $delta = 0;
 
   #
   # Get paused lexeme
@@ -270,7 +358,7 @@ sub _doPauseAfterLexeme {
 	      $newlexeme = 'IDENTIFIER';
 	  } else {
 	      my $line_columnp = lineAndCol($self->{_impl});
-	      logCroak("[%s] Lexeme value \"%s\" cannot be associated to TYPEDEF_NAME, ENUMERATION_CONSTANT nor IDENTIFIER at line %d, column %d.\n\nLast position:\n\n%s\n\nContext:\n\n%s", whoami(__PACKAGE__), $lexemeHashp->{value}, $lexemeHashp->{line}, $lexemeHashp->{column}, showLineAndCol(@{$line_columnp}, $self->{_sourcep}), $self->{_impl}->show_progress());
+	      logCroak("[%s] Lexeme value \"%s\" cannot be associated to TYPEDEF_NAME, ENUMERATION_CONSTANT nor IDENTIFIER at line %d, column %d.\n\nLast position:\n\n%s%s", whoami(__PACKAGE__), $lexemeHashp->{value}, $lexemeHashp->{line}, $lexemeHashp->{column}, showLineAndCol(@{$line_columnp}, $self->{_sourcep}), $self->_context());
 	  }
 	  #
 	  # Push the unambiguated lexeme
@@ -278,15 +366,18 @@ sub _doPauseAfterLexeme {
 	  $log->debugf('[%s] Pushing lexeme %s "%s"', whoami(__PACKAGE__), $newlexeme, $lexemeHashp->{value});
 	  if (! defined($self->{_impl}->lexeme_read($newlexeme, $lexemeHashp->{start}, $lexemeHashp->{length}, $lexemeHashp->{value}))) {
 	      my $line_columnp = lineAndCol($self->{_impl});
-	      logCroak("[%s] Lexeme value \"%s\" cannot be associated to lexeme name %s at position %d:%d.\n\nLast position:\n\n%s\n\nContext:\n\n%s", whoami(__PACKAGE__), $lexemeHashp->{value}, $newlexeme, $lexemeHashp->{line}, $lexemeHashp->{column}, showLineAndCol(@{$line_columnp}, $self->{_sourcep}), $self->{_impl}->show_progress());
+	      logCroak("[%s] Lexeme value \"%s\" cannot be associated to lexeme name %s at position %d:%d.\n\nLast position:\n\n%s%s", whoami(__PACKAGE__), $lexemeHashp->{value}, $newlexeme, $lexemeHashp->{line}, $lexemeHashp->{column}, showLineAndCol(@{$line_columnp}, $self->{_sourcep}), $self->_context());
 	  }
           $lexemeHashp->{name} = $newlexeme;
+          $delta = $lexemeHashp->{length};
 	  #
 	  # A lexeme_read() can generate an event
 	  #
 	  $self->_doEvents();
       }
   }
+
+  return $delta;
 }
 
 
@@ -304,7 +395,7 @@ MarpaX::Languages::C::AST - Translate a C source to an AST
 
 =head1 VERSION
 
-version 0.12
+version 0.13
 
 =head1 SYNOPSIS
 
@@ -396,9 +487,13 @@ String containing lexeme value.
 
 =back
 
-=head2 parse($self, $sourcep, $optionalArrayOfValuesb)
+=head2 parse($self, $sourcep)
 
-Do the parsing and return the blessed value. Takes as first parameter the reference to a C source code. Takes as optional second parameter a flag saying if the return value should be an array of all values or not. If this flag is false, the module will croak if there more than one parse tree value.
+Do the parsing. Takes as parameter the reference to a C source code. Returns $self, so that chaining with value method will be natural, i.e. parse()->value().
+
+=head2 value($self, $optionalArrayOfValuesb)
+
+Return the blessed value. Takes as optional parameter a flag saying if the return value should be an array of all values or not. If this flag is false, the module will croak if there more than one parse tree value. If this flag is true, a reference to an array of values will be returned, even if there is a single parse tree value.
 
 =head1 SEE ALSO
 

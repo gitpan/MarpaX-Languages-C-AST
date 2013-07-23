@@ -8,7 +8,7 @@ package MarpaX::Languages::C::AST::Grammar;
 use MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011;
 use Carp qw/croak/;
 
-our $VERSION = '0.12'; # VERSION
+our $VERSION = '0.13'; # TRIAL VERSION
 
 
 sub new {
@@ -60,7 +60,7 @@ MarpaX::Languages::C::AST::Grammar - C grammar written in Marpa BNF
 
 =head1 VERSION
 
-version 0.12
+version 0.13
 
 =head1 SYNOPSIS
 
