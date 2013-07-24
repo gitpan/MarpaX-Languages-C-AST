@@ -35,7 +35,7 @@ use Class::Struct
 
 use Carp qw/croak/;
 
-our $VERSION = '0.13'; # TRIAL VERSION
+our $VERSION = '0.14'; # VERSION
 
 
 sub _sort_by_option_priority_desc {
@@ -127,6 +127,11 @@ sub register {
   $self->prioritized_cb([sort _sort_by_option_priority_desc  @{$self->cb}]);
 
   #
+  # Invalid cache if any
+  #
+  $self->hscratchpad('_cache', 0);
+
+  #
   # We return the indice within Callback
   #
   return $self->ncb - 1;
@@ -185,18 +190,31 @@ sub _inventory_condition_tofire {
   my $nbConditionOK = 0;
   my $nbNewTopics = 0;
   my $ncb = $self->ncb;
+  my $prioritized_cbp = $self->prioritized_cb;
+  my $prioritized_cb_tofirep = $self->prioritized_cb_tofire;
+  my $selfArguments = $self->arguments();
+
+  my $cache = $self->hscratchpad('_cache') || 0;
+  my $cacheOptionp = $cache ? $self->hscratchpad('_cacheOption') : undef;
+  my $cacheOptionConditionModep = $cache ? $self->hscratchpad('_cacheOptionConditionMode') : undef;
+  my $cacheOptionConditionp = $cache ? $self->hscratchpad('_cacheOptionCondition') : undef;
+  my $cacheCbDescriptionp = $cache ? $self->hscratchpad('_cacheCbDescription') : undef;
+  my $cacheOptionTopicp = $cache ? $self->hscratchpad('_cacheOptionTopic') : undef;
+  my $cacheOptionTopic_persistencep = $cache ? $self->hscratchpad('_cacheOptionTopic_persistence') : undef;
+
   foreach (my $i = 0; $i < $ncb; $i++) {
-    my $cb = $self->prioritized_cb($i);
-    my $option = $cb->option;
-    my $conditionMode = $option->conditionMode;
+    my $cb = $prioritized_cbp->[$i];
+    my $option = $cache ? $cacheOptionp->[$i] : $cb->option;
+    my $conditionMode = $cache ? $cacheOptionConditionModep->[$i] : $option->conditionMode;
 
     my @condition = ();
-    foreach my $condition (@{$option->condition}) {
+    my $description = $cache ? $cacheCbDescriptionp->[$i] : $cb->description;
+    foreach my $condition ($cache ? @{$cacheOptionConditionp->[$i]} : @{$option->condition}) {
 	my ($coderef, @arguments) = @{$condition};
 	if (ref($coderef) eq 'CODE') {
-	    push(@condition, &$coderef($cb, $self, $self->arguments(), @arguments) ? 1 :0);
-	} elsif (defined($cb->description)) {
-	    push(@condition, (grep {$_ eq $cb->description} @{$self->arguments()}) ? 1 :0);
+	    push(@condition, &$coderef($cb, $self, $selfArguments, @arguments) ? 1 :0);
+	} elsif (defined($description)) {
+	    push(@condition, (grep {$_ eq $description} @{$selfArguments}) ? 1 :0);
 	}
     }
     #
@@ -217,16 +235,16 @@ sub _inventory_condition_tofire {
       }
     }
     if ($condition) {
-      $self->prioritized_cb_tofire($i, 1);
+      $prioritized_cb_tofirep->[$i] = 1;
       #
       # Initialize the associated topics if needed
       #
-      foreach my $topic (keys %{$option->topic}) {
-        next if (! defined($option->topic($topic)));
-        next if (! $option->topic($topic));
+      foreach my $topic (keys %{$cache ? $cacheOptionTopicp->[$i] : $option->topic}) {
+        next if (! defined($cache ? $cacheOptionTopicp->[$i]->{$topic} : $option->topic($topic)));
+        next if (! ($cache ? $cacheOptionTopicp->[$i]->{$topic} : $option->topic($topic)));
         if (! defined($self->topic_fired($topic))) {
           $self->topic_fired($topic, 1);
-          $self->topic_fired_persistence($topic, $option->topic_persistence);
+          $self->topic_fired_persistence($topic, $cache ? $cacheOptionTopic_persistencep->[$i] : $option->topic_persistence);
           if (! defined($self->topic_fired_data($topic))) {
             $self->topic_fired_data($topic, []);
 	    ++$nbNewTopics;
@@ -236,12 +254,60 @@ sub _inventory_condition_tofire {
       ++$nbConditionOK;
     } else {
       if (@condition) {
-        $self->prioritized_cb_tofire($i, -1);
+        $prioritized_cb_tofirep->[$i] = -1;
       }
     }
   }
 
   return $nbNewTopics;
+}
+
+#
+# Class::Struct is great but introduces overhead
+# The most critical accesses, identified using
+# Devel::NYTProf are cached here.
+#
+sub cache {
+  my $self = shift;
+
+  my @cacheOption = ();
+  my @cacheOptionConditionMode = ();
+  my @cacheOptionCondition = ();
+  my @cacheOptionSubscription = ();
+  my @cacheOptionSubscriptionMode = ();
+  my @cacheOptionTopic = ();
+  my @cacheOptionTopic_persistence = ();
+  my @cacheCbDescription = ();
+  my @cacheCbMethod = ();
+  my @cacheCbMethod_void = ();
+  my $prioritized_cbp = $self->prioritized_cb;
+  my $ncb = $self->ncb;
+  foreach (my $i = 0; $i < $ncb; $i++) {
+    my $cb = $prioritized_cbp->[$i];
+    my $option = $cb->option;
+    push(@cacheOption, $option);
+    push(@cacheOptionConditionMode, $option->conditionMode);
+    push(@cacheOptionCondition, $option->condition);
+    push(@cacheOptionSubscription, $option->subscription);
+    push(@cacheOptionSubscriptionMode, $option->subscriptionMode);
+    push(@cacheOptionTopic, $option->topic);
+    push(@cacheOptionTopic_persistence, $option->topic_persistence);
+    push(@cacheCbDescription, $cb->description);
+    push(@cacheCbMethod, $cb->method);
+    push(@cacheCbMethod_void, $cb->method_void);
+  }
+  $self->hscratchpad('_cacheOption', \@cacheOption);
+  $self->hscratchpad('_cacheOptionConditionMode', \@cacheOptionConditionMode);
+  $self->hscratchpad('_cacheOptionCondition', \@cacheOptionCondition);
+  $self->hscratchpad('_cacheOptionSubscription', \@cacheOptionSubscription);
+  $self->hscratchpad('_cacheOptionSubscriptionMode', \@cacheOptionSubscriptionMode);
+  $self->hscratchpad('_cacheOptionTopic', \@cacheOptionTopic);
+  $self->hscratchpad('_cacheOptionTopic_persistence', \@cacheOptionTopic_persistence);
+  $self->hscratchpad('_cacheCbDescription', \@cacheCbDescription);
+  $self->hscratchpad('_cacheCbMethod', \@cacheCbMethod);
+  $self->hscratchpad('_cacheCbMethod_void', \@cacheCbMethod_void);
+
+  $self->hscratchpad('_cache', 1);
 }
 
 sub _fire {
@@ -256,31 +322,40 @@ sub _fire {
   # This mean that nay on-the-flu registration/unregistration will happend at NEXT round.
   #
   my $ncb = $self->ncb;
-  my @prioritized_cb_tofire = @{$self->prioritized_cb_tofire};
-  my @prioritized_cb_fired = @{$self->prioritized_cb_fired};
-  my @prioritized_cb = @{$self->prioritized_cb};
+  my $prioritized_cb_tofirep = $self->prioritized_cb_tofire;
+  my $prioritized_cb_firedp = $self->prioritized_cb_fired;
+  my $prioritized_cbp = $self->prioritized_cb;
+  my $selfArguments = $self->arguments();
+
+  my $cache = $self->hscratchpad('_cache') || 0;
+  my $cacheCbMethodp = $cache ? $self->hscratchpad('_cacheCbMethod') : undef;
+  my $cacheCbMethod_voidp = $cache ? $self->hscratchpad('_cacheCbMethod_void') : undef;
+  my $cacheOptionTopicp = $cache ? $self->hscratchpad('_cacheOptionTopic') : undef;
+  my $cacheOptionTopic_persistencep = $cache ? $self->hscratchpad('_cacheOptionTopic_persistence') : undef;
+
   foreach (my $i = 0; $i < $ncb; $i++) {
-    if ($prioritized_cb_tofire[$i] <= 0) {
+    if ($prioritized_cb_tofirep->[$i] <= 0) {
       # -1: Condition KO
       # -2: Condition NA and Subscription NA
       # -3: Subscription KO
       next;
     }
-    my $cb = $prioritized_cb[$i];
-    if ($prioritized_cb_fired[$i]) {
+    my $cb = $prioritized_cbp->[$i];
+    if ($prioritized_cb_firedp->[$i]) {
       # already fired
       next;
     }
     #
     # Fire the callback (if there is a method)
     #
-    $self->prioritized_cb_fired($i, 1);
-    if (defined($cb->method)) {
+    $prioritized_cb_firedp->[$i] = 1;
+    my $method = $cache ? $cacheCbMethodp->[$i] : $cb->method;
+    if (defined($method)) {
       my @rc;
-      if (ref($cb->method) eq 'ARRAY') {
-        my ($method, @arguments) = @{$cb->method};
+      if (ref($method) eq 'ARRAY') {
+        my ($method, @arguments) = @{$method};
 	if (ref($method) eq 'CODE') {
-	    @rc = &$method($cb, $self, $self->arguments(), @arguments);
+	    @rc = &$method($cb, $self, $selfArguments, @arguments);
 	} else {
 	    @rc = $self->topic_fired_data($cb->description) || [];
 	}
@@ -289,10 +364,11 @@ sub _fire {
       # Push result to data attached to every topic of this callback
       #
       my $option = $cb->option;
-      if (! $cb->method_void) {
-        foreach my $topic (keys %{$option->topic}) {
-          next if (! defined($option->topic($topic)));
-          next if ($option->topic($topic) != 1);
+      my $method_void = $cache ? $cacheCbMethod_voidp->[$i] : $cb->method_void;
+      if (! $method_void) {
+        foreach my $topic (keys %{$cache ? $cacheOptionTopicp->[$i] : $option->topic}) {
+          next if (! defined($cache ? $cacheOptionTopicp->[$i]->{$topic} : $option->topic($topic)));
+          next if (($cache ? $cacheOptionTopicp->[$i]->{$topic} : $option->topic($topic)) != 1);
           my $topic_fired_data = $self->topic_fired_data($topic) || [];
           if (ref($cb->method) eq 'ARRAY') {
             if ($cb->method_mode eq 'push') {
@@ -367,15 +443,19 @@ sub _inventory_initialize_topic {
 
 sub _inventory_initialize_tofire {
   my $self = shift;
-  foreach (my $i = 0; $i < $self->ncb; $i++) {
-      $self->prioritized_cb_tofire($i, 0);
+  my $prioritized_cb_tofirep = $self->prioritized_cb_tofire;
+  my $ncb = $self->ncb;
+  foreach (my $i = 0; $i < $ncb; $i++) {
+      $prioritized_cb_tofirep->[$i] = 0;
   }
 }
 
 sub _inventory_initialize_fired {
   my $self = shift;
-  foreach (my $i = 0; $i < $self->ncb; $i++) {
-      $self->prioritized_cb_fired($i, 0);
+  my $prioritized_cb_firedp = $self->prioritized_cb_fired;
+  my $ncb = $self->ncb;
+  foreach (my $i = 0; $i < $ncb; $i++) {
+      $prioritized_cb_firedp->[$i] = 0;
   }
 }
 
@@ -412,21 +492,34 @@ sub _inventory_subscription_tofire {
   my $nbNewTopics = 0;
   my $nbSubscriptionOK = 0;
   my $ncb = $self->ncb;
+  my $prioritized_cbp = $self->prioritized_cb;
+  my $prioritized_cb_tofirep = $self->prioritized_cb_tofire;
+
+  my $cache = $self->hscratchpad('_cache') || 0;
+  my $cacheOptionp = $cache ? $self->hscratchpad('_cacheOption') : undef;
+  my $cacheOptionConditionModep = $cache ? $self->hscratchpad('_cacheOptionConditionMode') : undef;
+  my $cacheOptionConditionp = $cache ? $self->hscratchpad('_cacheOptionCondition') : undef;
+  my $cacheCbDescriptionp = $cache ? $self->hscratchpad('_cacheCbDescription') : undef;
+  my $cacheOptionSubscriptionp = $cache ? $self->hscratchpad('_cacheOptionSubscription') : undef;
+  my $cacheOptionSubscriptionModep = $cache ? $self->hscratchpad('_cacheOptionSubscriptionMode') : undef;
+  my $cacheOptionTopicp = $cache ? $self->hscratchpad('_cacheOptionTopic') : undef;
+  my $cacheOptionTopic_persistencep = $cache ? $self->hscratchpad('_cacheOptionTopic_persistence') : undef;
+
   foreach (my $i = 0; $i < $ncb; $i++) {
-    my $cb = $self->prioritized_cb($i);
-    my $option = $cb->option;
+    my $cb = $prioritized_cbp->[$i];
+    my $option = $cache ? $cacheOptionp->[$i] : $cb->option;
     #
     # Here the values can be:
     # -1: condition KO
     #  0: no condition applied
     #  1: condition OK
-    next if ($self->prioritized_cb_tofire($i) < 0);
+    next if ($prioritized_cb_tofirep->[$i] < 0);
 
     my %subscribed = ();
     my $nbSubscription = 0;
-    foreach my $subscription (keys %{$option->subscription}) {
-      next if (! defined($option->subscription($subscription)));
-      next if (! $option->subscription($subscription));
+    foreach my $subscription (keys %{$cache ? $cacheOptionSubscriptionp->[$i] : $option->subscription}) {
+      next if (! defined($cache ? $cacheOptionSubscriptionp->[$i]->{$subscription} : $option->subscription($subscription)));
+      next if (! ($cache ? $cacheOptionSubscriptionp->[$i]->{$subscription} : $option->subscription($subscription)));
       ++$nbSubscription;
       if (ref($subscription) eq 'Regexp') {
         foreach (keys %{$self->topic_fired}) {
@@ -443,33 +536,33 @@ sub _inventory_subscription_tofire {
       }
     }
 
-    if ($self->prioritized_cb_tofire($i) == 0 && ! keys %subscribed) {
+    if ($prioritized_cb_tofirep->[$i] == 0 && ! %subscribed) {
       #
       # no condition was setted and no subscription is raised
       #
-      $self->prioritized_cb_tofire($i, -2);
+      $prioritized_cb_tofirep->[$i] = -2;
       next;
     }
 
-    if ($nbSubscription > 0 && $option->subscriptionMode eq 'required' && $nbSubscription != keys %subscribed) {
+    if ($nbSubscription > 0 && ($cache ? $cacheOptionSubscriptionModep->[$i] : $option->subscriptionMode) eq 'required' && $nbSubscription != keys %subscribed) {
       #
       # There are active subscription not raised, and subscriptionMode is 'required'
       #
-      $self->prioritized_cb_tofire($i, -3);
+      $prioritized_cb_tofirep->[$i] = -3;
       next;
     }
 
-    if ($self->prioritized_cb_tofire($i) == 0) {
+    if ($prioritized_cb_tofirep->[$i] == 0) {
       #
       # There must have been topic subscription being raised
       #
-      $self->prioritized_cb_tofire($i, 1);
+      $prioritized_cb_tofirep->[$i] = 1;
       ++$nbSubscriptionOK;
     }
 
-    foreach my $topic (keys %{$option->topic}) {
-      next if (! defined($option->topic($topic)));
-      next if (! $option->topic($topic));
+    foreach my $topic (keys %{$cache ? $cacheOptionTopicp->[$i] : $option->topic}) {
+      next if (! defined($cache ? $cacheOptionTopicp->[$i]->{$topic} : $option->topic($topic)));
+      next if (! ($cache ? $cacheOptionTopicp->[$i]->{$topic} : $option->topic($topic)));
       if (! defined($self->topic_fired($topic))) {
         $self->topic_fired($topic, 1);
         $self->topic_fired_persistence($topic, $option->topic_persistence);
@@ -570,7 +663,7 @@ MarpaX::Languages::C::AST::Callback - Simple but powerful callback generic frame
 
 =head1 VERSION
 
-version 0.13
+version 0.14
 
 =head1 DESCRIPTION
 

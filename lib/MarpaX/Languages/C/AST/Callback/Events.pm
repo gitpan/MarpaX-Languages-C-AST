@@ -15,7 +15,7 @@ use constant LHS_PROCESS_EVENT => '<process>';
 use constant CLOSEANYSCOPE_PRIORITY => -1000;
 use constant RESETANYDATA_PRIORITY => -2000;
 
-our $VERSION = '0.13'; # TRIAL VERSION
+our $VERSION = '0.14'; # VERSION
 
 
 sub new {
@@ -73,8 +73,8 @@ sub new {
     push(@callbacks,
          $self->_register_rule_callbacks({
                                           lhs => 'declarationCheck',
-                                          rhs => [ [ 'declarationCheckdeclarationSpecifiers', [ 'storageClassSpecifierTypedef' ] ],
-                                                   [ 'declarationCheckinitDeclaratorList',    ['directDeclaratorIdentifier'  ] ]
+                                          rhs => [ [ 'declarationCheckdeclarationSpecifiers', [ [ 'storageClassSpecifierTypedef', 'typedef' ] ] ],
+                                                   [ 'declarationCheckinitDeclaratorList',    [ 'directDeclaratorIdentifier' ] ]
                                                  ],
                                           method => \&_declarationCheck,
                                           # ---------------------------
@@ -119,8 +119,8 @@ sub new {
     push(@callbacks,
          $self->_register_rule_callbacks({
                                           lhs => 'functionDefinitionCheck1',
-                                          rhs => [ [ 'functionDefinitionCheck1declarationSpecifiers', [ 'storageClassSpecifierTypedef' ] ],
-                                                   [ 'functionDefinitionCheck1declarationList',       [ 'storageClassSpecifierTypedef' ] ]
+                                          rhs => [ [ 'functionDefinitionCheck1declarationSpecifiers', [ [ 'storageClassSpecifierTypedef', 'typedef' ] ] ],
+                                                   [ 'functionDefinitionCheck1declarationList',       [ [ 'storageClassSpecifierTypedef', 'typedef' ] ] ]
                                                  ],
                                           method => \&_functionDefinitionCheck1,
                                           process_priority => CLOSEANYSCOPE_PRIORITY + 1,
@@ -130,7 +130,7 @@ sub new {
     push(@callbacks,
          $self->_register_rule_callbacks({
                                           lhs => 'functionDefinitionCheck2',
-                                          rhs => [ [ 'functionDefinitionCheck2declarationSpecifiers', [ 'storageClassSpecifierTypedef' ] ],
+                                          rhs => [ [ 'functionDefinitionCheck2declarationSpecifiers', [ [ 'storageClassSpecifierTypedef', 'typedef' ] ] ],
                                                  ],
                                           method => \&_functionDefinitionCheck2,
                                           process_priority => CLOSEANYSCOPE_PRIORITY + 1,
@@ -152,7 +152,7 @@ sub new {
     push(@callbacks,
          $self->_register_rule_callbacks({
                                           lhs => 'parameterDeclarationCheck',
-                                          rhs => [ [ 'parameterDeclarationdeclarationSpecifiers', [ 'storageClassSpecifierTypedef' ] ]
+                                          rhs => [ [ 'parameterDeclarationdeclarationSpecifiers', [ [ 'storageClassSpecifierTypedef', 'typedef' ] ] ]
                                                  ],
                                           method => \&_parameterDeclarationCheck,
                                          }
@@ -228,6 +228,14 @@ sub new {
 		     )
 		    )
 	);
+
+    #
+    # We are not going to register/unregister/unsubscribe/change topics etc... we can say to Callback that it can
+    # can cache everything that is intensive. Take care, any configuration data to Callback becomes then static.
+    #
+    foreach ($self, @callbacks) {
+      $_->cache();
+    }
 
     return $self;
 }
@@ -366,7 +374,7 @@ sub _exitScopeCallback {
 }
 # ----------------------------------------------------------------------------------------
 sub _storage_helper {
-    my ($method, $callback, $eventsp, $event, $countersHashp) = @_;
+    my ($method, $callback, $eventsp, $event, $countersHashp, $fixedValue) = @_;
     #
     # Collect the counters
     #
@@ -385,7 +393,7 @@ sub _storage_helper {
 	$rc = [ lineAndCol($callback->hscratchpad('_impl')), %counters ];
     } elsif (substr($symbol, -1, 1) eq '$') {
 	substr($symbol, -1, 1, '');
-	$rc = [ lineAndCol($callback->hscratchpad('_impl')), lastCompleted($callback->hscratchpad('_impl'), $symbol), %counters ];
+	$rc = [ lineAndCol($callback->hscratchpad('_impl')), $fixedValue || lastCompleted($callback->hscratchpad('_impl'), $symbol), %counters ];
     }
 
     return $rc;
@@ -505,12 +513,27 @@ sub _register_rule_callbacks {
   # Collect the unique list of <Gx$>
   #
   my %genomeEvents = ();
+  my %genomeEventValues = ();
   foreach (@{$hashp->{rhs}}) {
     my ($rhs, $genomep) = @{$_};
     foreach (@{$genomep}) {
-	my $event = $_ . '$';
+      #
+      # The genome events will call, by default, last_completed(), which cost
+      # quite a lot. There is no need to do such call when we know in advance
+      # what will be to token value.
+      my ($name, $value);
+      if (ref($_) eq 'ARRAY') {
+        #
+        # Token value known in advance
+        #
+        ($name, $value) = @{$_};
+      } else {
+        ($name, $value) = ($_, undef);
+      }
+	my $event = $name . '$';
 	++$genomeEvents{$event};
 	++$rshProcessEvents{$event};
+      $genomeEventValues{$event} = $value;
     }
   }
   #
@@ -522,7 +545,7 @@ sub _register_rule_callbacks {
 			    (
 			     description => $_,
                              extra_description => "$_ [storage] ",
-			     method =>  [ \&_storage_helper, $_, $countersHashp ],
+			     method =>  [ \&_storage_helper, $_, $countersHashp, $genomeEventValues{$_} ],
 			     option => MarpaX::Languages::C::AST::Callback::Option->new
 			     (
 			      topic => {$_ => 1},
@@ -546,8 +569,17 @@ sub _register_rule_callbacks {
     my %genomeTopicsToUpdate = ();
     my %genomeTopicsNotToUpdate = ();
     foreach (@{$genomep}) {
-      $genomeTopicsToUpdate{$_ . '$'} = 1;
-      $genomeTopicsNotToUpdate{$_ . '$'} = -1;
+      my ($name, $value);
+      if (ref($_) eq 'ARRAY') {
+        #
+        # Token value known in advance
+        #
+        ($name, $value) = @{$_};
+      } else {
+        ($name, $value) = ($_, undef);
+      }
+      $genomeTopicsToUpdate{$name . '$'} = 1;
+      $genomeTopicsNotToUpdate{$name . '$'} = -1;
     }
     #
     # rhs$ event will collect into rhs$ topic all Gx$ topics (created automatically if needed)
@@ -709,7 +741,7 @@ MarpaX::Languages::C::AST::Callback::Events - Events callback when translating a
 
 =head1 VERSION
 
-version 0.13
+version 0.14
 
 =head1 DESCRIPTION
 
