@@ -21,7 +21,7 @@ autoflush STDOUT 1;
 
 # ABSTRACT: C source analysis
 
-our $VERSION = '0.14'; # VERSION
+our $VERSION = '0.15'; # VERSION
 
 # PODNAME: c2ast.pl
 
@@ -412,7 +412,7 @@ c2ast.pl - C source analysis
 
 =head1 VERSION
 
-version 0.14
+version 0.15
 
 =head1 DESCRIPTION
 
@@ -428,7 +428,7 @@ This script will use Marpa::R2 to analyse the file given in argument.
 
 =back
 
-Please say --help on the command-line to have the full list of options, and examples.
+Say --help on the command-line to have the full list of options, and examples.
 
 =head1 AUTHOR
 

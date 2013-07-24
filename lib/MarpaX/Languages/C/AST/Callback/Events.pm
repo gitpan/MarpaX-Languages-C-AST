@@ -15,7 +15,7 @@ use constant LHS_PROCESS_EVENT => '<process>';
 use constant CLOSEANYSCOPE_PRIORITY => -1000;
 use constant RESETANYDATA_PRIORITY => -2000;
 
-our $VERSION = '0.14'; # VERSION
+our $VERSION = '0.15'; # VERSION
 
 
 sub new {
@@ -741,7 +741,7 @@ MarpaX::Languages::C::AST::Callback::Events - Events callback when translating a
 
 =head1 VERSION
 
-version 0.14
+version 0.15
 
 =head1 DESCRIPTION
 
