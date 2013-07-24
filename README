@@ -2,7 +2,7 @@ NAME
     MarpaX::Languages::C::AST - Translate a C source to an AST
 
 VERSION
-    version 0.15
+    version 0.16
 
 SYNOPSIS
         use strict;
@@ -63,8 +63,8 @@ SUBROUTINES/METHODS
         Name of a grammar. Default is 'ISO-ANSI-C-2011'.
 
     logInfo
-        Issue logging with level 'info' for every found lexeme. Default is 0
-        (i.e. false). Please note that logging is done through Log::Any.
+        Reference to an array of lexemes for which a log of level INFO will
+        be issued.
 
     lexemeCallback
         Array reference containing a CODE ref and optional arguments. This

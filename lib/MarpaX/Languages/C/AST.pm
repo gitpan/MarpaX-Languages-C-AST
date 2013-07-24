@@ -13,16 +13,23 @@ use MarpaX::Languages::C::AST::Impl qw//;
 use MarpaX::Languages::C::AST::Scope qw//;
 use MarpaX::Languages::C::AST::Callback::Events qw//;
 
-our $VERSION = '0.15'; # VERSION
+our $VERSION = '0.16'; # VERSION
 
 
 # ----------------------------------------------------------------------------------------
 sub new {
   my ($class, %opts) = @_;
 
+  my $logInfo = $opts{logInfo} || [];
+  if (ref($logInfo) ne 'ARRAY') {
+      croak 'logInfo must be a reference to ARRAY';
+  }
+  my %logInfo = ();
+  map {$logInfo{$_}++} @{$logInfo};
+
   my $grammarName = $opts{grammarName} || 'ISO-ANSI-C-2011';
 
-  my $grammar = MarpaX::Languages::C::AST::Grammar->new($grammarName);
+  my $grammar = MarpaX::Languages::C::AST::Grammar->new($grammarName, \%logInfo);
   my $grammar_option = $grammar->grammar_option();
   $grammar_option->{bless_package} = 'C::AST';
   $grammar_option->{source} = \$grammar->content();
@@ -50,8 +57,7 @@ sub new {
                _impl               => MarpaX::Languages::C::AST::Impl->new($grammar_option, $recce_option),
                _sourcep            => undef,
 	       _lexemeCallback     => $lexemeCallback,
-	       _lexemeCallbackArgs => \@lexemeCallbackArgs,
-	       _logInfo            => $opts{logInfo} || 0
+	       _lexemeCallbackArgs => \@lexemeCallbackArgs
               };
 
   bless($self, $class);
@@ -92,7 +98,7 @@ sub parse {
     $self->_getLexeme(\%lexeme);
     $self->_doScope(\%lexeme);
     $self->_doEvents();
-    $pos += $self->_doPauseLexeme(\%lexeme);
+    $pos += $self->_doPauseAfterLexeme(\%lexeme);
     $self->_doLogInfo(\%lexeme);
     $self->_doLexemeCallback(\%lexeme);
     $self->_doPreprocessing($pos);
@@ -166,7 +172,9 @@ sub _getLexeme {
   my ($self, $lexemeHashp) = @_;
 
   #
-  # Get paused "before" lexeme
+  # Get paused lexeme
+  # Trustable if pause after
+  # See _doPauseAfterLexeme for the others
   #
   my $lexeme = $self->{_impl}->pause_lexeme();
   if (defined($lexeme)) {
@@ -180,7 +188,7 @@ sub _getLexeme {
 sub _doLogInfo {
   my ($self, $lexemeHashp) = @_;
 
-  if ($self->{_logInfo} && exists($lexemeHashp->{name})) {
+  if (exists($lexemeHashp->{name})) {
     $log->infof("[%8d:%3d] %-30s %s", $lexemeHashp->{line}, $lexemeHashp->{column}, $lexemeHashp->{name}, $lexemeHashp->{value});
   }
 }
@@ -330,7 +338,7 @@ sub _doScope {
   }
 }
 # ----------------------------------------------------------------------------------------
-sub _doPauseLexeme {
+sub _doPauseAfterLexeme {
   my ($self, $lexemeHashp) = @_;
 
   my $delta = 0;
@@ -395,7 +403,7 @@ MarpaX::Languages::C::AST - Translate a C source to an AST
 
 =head1 VERSION
 
-version 0.15
+version 0.16
 
 =head1 SYNOPSIS
 
@@ -451,7 +459,7 @@ Name of a grammar. Default is 'ISO-ANSI-C-2011'.
 
 =item logInfo
 
-Issue logging with level 'info' for every found lexeme. Default is 0 (i.e. false). Please note that logging is done through Log::Any.
+Reference to an array of lexemes for which a log of level INFO will be issued.
 
 =item lexemeCallback
 

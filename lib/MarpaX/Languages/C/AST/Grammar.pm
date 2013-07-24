@@ -8,17 +8,18 @@ package MarpaX::Languages::C::AST::Grammar;
 use MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011;
 use Carp qw/croak/;
 
-our $VERSION = '0.15'; # VERSION
+our $VERSION = '0.16'; # VERSION
 
 
 sub new {
-  my ($class, $grammarName) = @_;
+  my $class = shift;
+  my $grammarName = shift;
 
   my $self = {};
   if (! defined($grammarName)) {
     croak 'Usage: new($grammar_Name)';
   } elsif ($grammarName eq 'ISO-ANSI-C-2011') {
-    $self->{_grammar} = MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011->new();
+    $self->{_grammar} = MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011->new(@_);
   } else {
     croak "Unsupported grammar name $grammarName";
   }
@@ -60,7 +61,7 @@ MarpaX::Languages::C::AST::Grammar - C grammar written in Marpa BNF
 
 =head1 VERSION
 
-version 0.15
+version 0.16
 
 =head1 SYNOPSIS
 
@@ -82,9 +83,9 @@ ISO-ANSI-C-2011. The ISO grammar of ANSI C 2011, as of L<http://www.quut.com/c/A
 
 =head1 SUBROUTINES/METHODS
 
-=head2 new()
+=head2 new($grammarName, ...)
 
-Instance a new object. Takes the name of the grammar as argument.
+Instance a new object. Takes the name of the grammar as argument. Remaining arguments are passed to the sub grammar method.
 
 =head2 content()
 

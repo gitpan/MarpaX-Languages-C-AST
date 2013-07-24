@@ -21,7 +21,7 @@ autoflush STDOUT 1;
 
 # ABSTRACT: C source analysis
 
-our $VERSION = '0.15'; # VERSION
+our $VERSION = '0.16'; # VERSION
 
 # PODNAME: c2ast.pl
 
@@ -121,7 +121,7 @@ if ($progress) {
 # Parse C
 # -------
 map {++$lexemeCallbackHash{lexeme}->{$_}} @lexeme;
-my $cAstObject = MarpaX::Languages::C::AST->new(lexemeCallback => [ \&lexemeCallback, \%lexemeCallbackHash ], logInfo => $log->is_info());
+my $cAstObject = MarpaX::Languages::C::AST->new(lexemeCallback => [ \&lexemeCallback, \%lexemeCallbackHash ], logInfo => \@lexeme);
 my $bless = $cAstObject->parse(\$preprocessedOutput);
 if ($progress) {
     if ($lexemeCallbackHash{nbLines} > $lexemeCallbackHash{next_progress}) {
@@ -412,7 +412,7 @@ c2ast.pl - C source analysis
 
 =head1 VERSION
 
-version 0.15
+version 0.16
 
 =head1 DESCRIPTION
 
