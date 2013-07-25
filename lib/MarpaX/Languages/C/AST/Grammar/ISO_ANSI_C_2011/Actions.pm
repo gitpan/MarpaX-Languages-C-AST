@@ -5,7 +5,7 @@ package MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011::Actions;
 
 # ABSTRACT: ISO ANSI C 2011 grammar actions
 
-our $VERSION = '0.16'; # VERSION
+our $VERSION = '0.17'; # VERSION
 
 
 sub new {
@@ -49,7 +49,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011::Actions - ISO ANSI C 2011 g
 
 =head1 VERSION
 
-version 0.16
+version 0.17
 
 =head1 DESCRIPTION
 
