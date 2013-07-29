@@ -12,7 +12,6 @@ use List::Util qw/max/;
 my @modules = qw(
   Carp
   Class::Struct
-  Config
   Data::Dumper
   Exporter
   ExtUtils::MakeMaker

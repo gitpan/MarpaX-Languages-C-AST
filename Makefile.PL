@@ -24,7 +24,6 @@ my %WriteMakefileArgs = (
   "PREREQ_PM" => {
     "Carp" => 0,
     "Class::Struct" => 0,
-    "Config" => 0,
     "Data::Dumper" => 0,
     "Exporter" => 0,
     "File::Basename" => 0,
@@ -55,7 +54,7 @@ my %WriteMakefileArgs = (
     "Test::More" => 0,
     "Test::Trap" => 0
   },
-  "VERSION" => "0.17",
+  "VERSION" => "0.18",
   "test" => {
     "TESTS" => "t/*.t"
   }

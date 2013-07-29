@@ -12,6 +12,7 @@ blog/blogs.perl.org/01_Marpa_Power_or_About_Parsing_The_C_Language.html
 dist.ini
 examples/atomic_type_qualifier.pl
 examples/atomic_type_specifier.pl
+examples/c2astgcc.pl
 examples/file.pl
 examples/if-if-else.pl
 examples/synopsis.pl

@@ -4,7 +4,6 @@ use warnings FATAL => 'all';
 use diagnostics;
 use MarpaX::Languages::C::AST;
 use Getopt::Long;
-use Config;
 use IPC::Run qw/run/;
 use Term::ProgressBar;
 use POSIX qw/EXIT_FAILURE EXIT_SUCCESS/;
@@ -21,7 +20,7 @@ autoflush STDOUT 1;
 
 # ABSTRACT: C source analysis
 
-our $VERSION = '0.17'; # VERSION
+our $VERSION = '0.18'; # TRIAL VERSION
 
 # PODNAME: c2ast.pl
 
@@ -37,6 +36,7 @@ my $dump = 0;
 my $dumpfile = '';
 my $allowAmbiguity = 0;
 my $loglevel = 'WARN';
+my $logstderr = 0;
 
 Getopt::Long::Configure("pass_through");
 GetOptions ('help!' => \$help,
@@ -49,7 +49,8 @@ GetOptions ('help!' => \$help,
             'dump!' => \$dump,
             'dumpfile=s' => \$dumpfile,
             'allowAmbiguity!' => \$allowAmbiguity,
-            'loglevel=s' => \$loglevel);
+            'loglevel=s' => \$loglevel,
+            'logstderr!' => \$logstderr);
 
 # ----
 # Init 
@@ -57,7 +58,7 @@ GetOptions ('help!' => \$help,
 my $defaultLog4perlConf = <<DEFAULT_LOG4PERL_CONF;
 log4perl.rootLogger              = $loglevel, Screen
 log4perl.appender.Screen         = Log::Log4perl::Appender::Screen
-log4perl.appender.Screen.stderr  = 0
+log4perl.appender.Screen.stderr  = $logstderr
 log4perl.appender.Screen.layout  = PatternLayout
 log4perl.appender.Screen.layout.ConversionPattern = %d %-5p %6P %m{chomp}%n
 DEFAULT_LOG4PERL_CONF
@@ -383,6 +384,8 @@ where options can be:
                      then:
                      --loglevel TRACE
 
+--logstderr          Logs to stderr or not. Default is $logstderr.
+
 Examples:
 
 $0                   -D MYDEFINE1 -D MYDEFINE2 -I       /tmp/myIncludeDir            /tmp/myfile.c
@@ -412,7 +415,7 @@ c2ast.pl - C source analysis
 
 =head1 VERSION
 
-version 0.17
+version 0.18
 
 =head1 DESCRIPTION
 

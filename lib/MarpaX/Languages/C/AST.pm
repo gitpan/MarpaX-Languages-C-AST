@@ -13,7 +13,7 @@ use MarpaX::Languages::C::AST::Impl qw//;
 use MarpaX::Languages::C::AST::Scope qw//;
 use MarpaX::Languages::C::AST::Callback::Events qw//;
 
-our $VERSION = '0.17'; # VERSION
+our $VERSION = '0.18'; # TRIAL VERSION
 
 
 # ----------------------------------------------------------------------------------------
@@ -57,7 +57,8 @@ sub new {
                _impl               => MarpaX::Languages::C::AST::Impl->new($grammar_option, $recce_option),
                _sourcep            => undef,
 	       _lexemeCallback     => $lexemeCallback,
-	       _lexemeCallbackArgs => \@lexemeCallbackArgs
+	       _lexemeCallbackArgs => \@lexemeCallbackArgs,
+	       _logInfo            => \%logInfo
               };
 
   bless($self, $class);
@@ -188,7 +189,7 @@ sub _getLexeme {
 sub _doLogInfo {
   my ($self, $lexemeHashp) = @_;
 
-  if (exists($lexemeHashp->{name})) {
+  if (exists($lexemeHashp->{name}) && exists($self->{_logInfo}->{$lexemeHashp->{name}})) {
     $log->infof("[%8d:%3d] %-30s %s", $lexemeHashp->{line}, $lexemeHashp->{column}, $lexemeHashp->{name}, $lexemeHashp->{value});
   }
 }
@@ -233,7 +234,7 @@ sub _doPreprocessing {
 	my $preprocessorDirective = substr(${$self->{_sourcep}}, $-[2], $+[2] - $-[2]);
 	my $directive = substr(${$self->{_sourcep}}, $-[3], $+[3] - $-[3]);
 	my $lastChar = substr(${$self->{_sourcep}}, $-[4], $+[4] - $-[4]);
-	$log->infof('Preprocessor: %s', $preprocessorDirective);
+	$log->debugf('Preprocessor: %s', $preprocessorDirective);
 	#
 	# Last char is newline ?
 	#
@@ -403,7 +404,7 @@ MarpaX::Languages::C::AST - Translate a C source to an AST
 
 =head1 VERSION
 
-version 0.17
+version 0.18
 
 =head1 SYNOPSIS
 

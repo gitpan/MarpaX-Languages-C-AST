@@ -10,7 +10,7 @@ use Marpa::R2 2.064000;
 use Carp qw/croak/;
 use MarpaX::Languages::C::AST::Impl::Logger;
 
-our $VERSION = '0.17'; # VERSION
+our $VERSION = '0.18'; # TRIAL VERSION
 
 our $MARPA_TRACE_FILE_HANDLE;
 our $MARPA_TRACE_BUFFER;
@@ -60,121 +60,87 @@ sub new {
 
 
 sub value {
-  my $self = shift;
-
-  return $self->{recce}->value(@_);
+  return $_[0]->{recce}->value(@_[1..$#_]);
 }
 
 
 sub read {
-  my $self = shift;
-
-  return $self->{recce}->read(@_);
+  return $_[0]->{recce}->read(@_[1..$#_]);
 }
 
 
 sub resume {
-  my $self = shift;
-
-  return $self->{recce}->resume(@_);
+  return $_[0]->{recce}->resume(@_[1..$#_]);
 }
 
 
 sub last_completed {
-  my $self = shift;
-
-  return $self->{recce}->last_completed(@_);
+  return $_[0]->{recce}->last_completed(@_[1..$#_]);
 }
 
 
 sub last_completed_range {
-  my $self = shift;
-
-  return $self->{recce}->last_completed_range(@_);
+  return $_[0]->{recce}->last_completed_range(@_[1..$#_]);
 }
 
 
 sub range_to_string {
-  my $self = shift;
-
-  return $self->{recce}->range_to_string(@_);
+  return $_[0]->{recce}->range_to_string(@_[1..$#_]);
 }
 
 
 sub event {
-  my $self = shift;
-
-  return $self->{recce}->event(@_);
+  return $_[0]->{recce}->event(@_[1..$#_]);
 }
 
 
 sub pause_lexeme {
-  my $self = shift;
-
-  return $self->{recce}->pause_lexeme(@_);
+  return $_[0]->{recce}->pause_lexeme(@_[1..$#_]);
 }
 
 
 sub pause_span {
-  my $self = shift;
-
-  return $self->{recce}->pause_span(@_);
+  return $_[0]->{recce}->pause_span(@_[1..$#_]);
 }
 
 
 sub literal {
-  my $self = shift;
-
-  return $self->{recce}->literal(@_);
+  return $_[0]->{recce}->literal(@_[1..$#_]);
 }
 
 
 sub line_column {
-  my $self = shift;
-
-  return $self->{recce}->line_column(@_);
+  return $_[0]->{recce}->line_column(@_[1..$#_]);
 }
 
 
 sub substring {
-  my $self = shift;
-
-  return $self->{recce}->substring(@_);
+  return $_[0]->{recce}->substring(@_[1..$#_]);
 }
 
 
 sub lexeme_read {
-  my $self = shift;
-
-  return $self->{recce}->lexeme_read(@_);
+  return $_[0]->{recce}->lexeme_read(@_[1..$#_]);
 }
 
 
 sub current_g1_location {
-  my $self = shift;
-
-  return $self->{recce}->current_g1_location(@_);
+  return $_[0]->{recce}->current_g1_location(@_[1..$#_]);
 }
 
 
 sub g1_location_to_span {
-  my $self = shift;
-
-  return $self->{recce}->g1_location_to_span(@_);
+  return $_[0]->{recce}->g1_location_to_span(@_[1..$#_]);
 }
 
 
 sub terminals_expected {
-  my $self = shift;
-
-  return $self->{recce}->terminals_expected(@_);
+  return $_[0]->{recce}->terminals_expected(@_[1..$#_]);
 }
 
 
 sub show_progress {
-  my $self = shift;
-
-  return $self->{recce}->show_progress(@_);
+  return $_[0]->{recce}->show_progress(@_[1..$#_]);
 }
 
 1;
@@ -191,7 +157,7 @@ MarpaX::Languages::C::AST::Impl - Implementation of Marpa's interface
 
 =head1 VERSION
 
-version 0.17
+version 0.18
 
 =head1 SYNOPSIS
 
