@@ -9,11 +9,13 @@ use Exporter 'import';
 use Log::Any qw/$log/;
 use Data::Dumper;
 use Carp qw/croak/;
+# Marpa follows Unicode recommendation, i.e. perl's \R, that cannot be in a character class
+our $NEWLINE_REGEXP = qr/(?>\x0D\x0A|\v)/;
 
-our $VERSION = '0.19'; # VERSION
+our $VERSION = '0.20'; # TRIAL VERSION
 # CONTRIBUTORS
 
-our @EXPORT_OK = qw/whoami whowasi traceAndUnpack logCroak showLineAndCol lineAndCol lastCompleted/;
+our @EXPORT_OK = qw/whoami whowasi traceAndUnpack logCroak showLineAndCol lineAndCol lastCompleted startAndLength/;
 our %EXPORT_TAGS = ('all' => [ @EXPORT_OK ]);
 
 
@@ -86,9 +88,30 @@ sub showLineAndCol {
     my ($line, $col, $sourcep) = @_;
 
     my $pointer = ($col > 0 ? '-' x ($col-1) : '') . '^';
-    my $content = (split("\n", ${$sourcep}))[$line-1];
+    my $content = '';
+
+    my $prevpos = pos(${$sourcep});
+    pos(${$sourcep}) = undef;
+    my $thisline = 0;
+    my $nbnewlines = 0;
+    my $eos = 0;
+    while (${$sourcep} =~ m/\G(.*?)($NEWLINE_REGEXP|\Z)/scmg) {
+      if (++$thisline == $line) {
+        $content = substr(${$sourcep}, $-[1], $+[1] - $-[1]);
+        $eos = (($+[2] - $-[2]) > 0) ? 0 : 1;
+        last;
+      }
+    }
     $content =~ s/\t/ /g;
-    return "line:column $line:$col\n\n$content\n$pointer";
+    if ($content) {
+      $nbnewlines = (substr(${$sourcep}, 0, pos(${$sourcep})) =~ tr/\n//);
+      if ($eos) {
+        ++$nbnewlines; # End of string instead of $NEWLINE_REGEXP
+      }
+    }
+    pos(${$sourcep}) = $prevpos;
+
+    return "line:column $line:$col (Unicode newline count) $nbnewlines:$col (\\n count)\n\n$content\n$pointer";
 }
 
 
@@ -99,6 +122,15 @@ sub lineAndCol {
     my ($start, $length) = $impl->g1_location_to_span($g1);
     my ($line, $column) = $impl->line_column($start);
     return [ $line, $column ];
+}
+
+
+sub startAndLength {
+    my ($impl, $g1) = @_;
+
+    $g1 //= $impl->current_g1_location();
+    my ($start, $length) = $impl->g1_location_to_span($g1);
+    return [ $start, $length ];
 }
 
 
@@ -122,7 +154,7 @@ MarpaX::Languages::C::AST::Util - C Translation to AST - Class method utilities
 
 =head1 VERSION
 
-version 0.19
+version 0.20
 
 =head1 SYNOPSIS
 
@@ -146,13 +178,13 @@ The methods whoami(), whowasi() and traceAndUnpack() are exported on demand.
 
 =head1 SUBROUTINES/METHODS
 
-=head2 whoami()
+=head2 whoami($base)
 
-Returns the name of the calling routine.
+Returns the name of the calling routine. Optional $base prefix is removed. Typical usage is whoami(__PACKAGE__).
 
-=head2 whowasi()
+=head2 whowasi($base)
 
-Returns the name of the parent's calling routine.
+Returns the name of the parent's calling routine. Optional $base prefix is removed. Typical usage is whowasi(__PACKAGE__).
 
 =head2 traceAndUnpack($nameOfArgumentsp, @arguments)
 
@@ -170,6 +202,10 @@ Returns a string showing the request line, followed by another string that shows
 
 Returns the output of Marpa's line_column at a given $g1 location. Default $g1 is Marpa's current_g1_location().
 
+=head2 startAndLength($impl, $g1)
+
+Returns the output of Marpa's g1_location_to_span at a given $g1 location. Default $g1 is Marpa's current_g1_location().
+
 =head2 lastCompleted($impl, $symbol)
 
 Returns the string corresponding the last completion of $symbol.
@@ -177,20 +213,6 @@ Returns the string corresponding the last completion of $symbol.
 =head1 AUTHOR
 
 Jean-Damien Durand <jeandamiendurand@free.fr>
-
-=head1 CONTRIBUTORS
-
-=over 4
-
-=item *
-
-Jeffrey Kegler <jkegl@cpan.org>
-
-=item *
-
-jddurand <jeandamiendurand@free.fr>
-
-=back
 
 =head1 COPYRIGHT AND LICENSE
 

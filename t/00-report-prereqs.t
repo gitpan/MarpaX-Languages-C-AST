@@ -16,11 +16,11 @@ my @modules = qw(
   Exporter
   ExtUtils::MakeMaker
   File::Basename
-  File::Find
   File::Spec::Functions
   File::Temp
   Getopt::Long
   IO::Handle
+  IPC::Open3
   IPC::Run
   List::Util
   Log::Any

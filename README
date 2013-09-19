@@ -2,7 +2,7 @@ NAME
     MarpaX::Languages::C::AST - Translate a C source to an AST
 
 VERSION
-    version 0.19
+    version 0.20
 
 SYNOPSIS
         use strict;
@@ -95,6 +95,9 @@ SUBROUTINES/METHODS
     Do the parsing. Takes as parameter the reference to a C source code.
     Returns $self, so that chaining with value method will be natural, i.e.
     parse()->value().
+
+  scope($self)
+    Returns the MarpaX::Languages::C::AST::Scope object.
 
   value($self, $optionalArrayOfValuesb)
     Return the blessed value. Takes as optional parameter a flag saying if

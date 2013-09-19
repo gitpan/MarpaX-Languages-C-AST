@@ -10,7 +10,7 @@ use Storable qw/dclone/;
 use Log::Any qw/$log/;
 use Carp qw/croak/;
 
-our $VERSION = '0.19'; # VERSION
+our $VERSION = '0.20'; # TRIAL VERSION
 
 
 sub new {
@@ -26,6 +26,20 @@ sub new {
   bless($self, $class);
 
   return $self;
+}
+
+
+sub typedefPerScope {
+  my ($self) = @_;
+
+  return $self->{_typedefPerScope};
+}
+
+
+sub enumAnyScope {
+  my ($self) = @_;
+
+  return $self->{_enumAnyScope};
 }
 
 
@@ -134,10 +148,12 @@ sub doExitScope {
 
 
 sub parseEnterTypedef {
-  my ($self, $token) = @_;
+  my ($self, $token, $data) = @_;
+
+  $data //= 1;
 
   my $scope = $self->parseScopeLevel;
-  $self->{_typedefPerScope}->[$scope]->{$token} = 1;
+  $self->{_typedefPerScope}->[$scope]->{$token} = $data;
 
   if ($log->is_debug) {
       $log->debugf('[%s] "%s" typedef entered at scope %d', whoami(__PACKAGE__), $token, $scope);
@@ -146,9 +162,11 @@ sub parseEnterTypedef {
 
 
 sub parseEnterEnum {
-  my ($self, $token) = @_;
+  my ($self, $token, $data) = @_;
 
-  $self->{_enumAnyScope}->{$token} = 1;
+  $data //= 1;
+
+  $self->{_enumAnyScope}->{$token} = $data;
   my $scope = $self->parseScopeLevel;
   if ($log->is_debug) {
       $log->debugf('[%s] "%s" enum entered at scope %d', whoami(__PACKAGE__), $token, $scope);
@@ -166,7 +184,7 @@ sub parseObscureTypedef {
   my ($self, $token, $scope) = @_;
 
   $scope //= $self->parseScopeLevel;
-  $self->{_typedefPerScope}->[$scope]->{$token} = 0;
+  $self->{_typedefPerScope}->[$scope]->{$token} = undef;
 
   if ($log->is_debug) {
       $log->debugf('[%s] "%s" eventual typedef obscured at scope %d', whoami(__PACKAGE__), $token, $scope);
@@ -178,7 +196,7 @@ sub parseIsTypedef {
   my ($self, $token) = @_;
 
   my $scope = $self->parseScopeLevel;
-  my $rc = (exists($self->{_typedefPerScope}->[$scope]->{$token}) && $self->{_typedefPerScope}->[$scope]->{$token}) ? 1 : 0;
+  my $rc = (exists($self->{_typedefPerScope}->[$scope]->{$token}) && defined($self->{_typedefPerScope}->[$scope]->{$token})) ? 1 : 0;
 
   if ($log->is_debug) {
       $log->debugf('[%s] "%s" at scope %d is a typedef? %s', whoami(__PACKAGE__), $token, $scope, $rc ? 'yes' : 'no');
@@ -215,7 +233,7 @@ MarpaX::Languages::C::AST::Scope - Scope management when translating a C source 
 
 =head1 VERSION
 
-version 0.19
+version 0.20
 
 =head1 SYNOPSIS
 
@@ -250,6 +268,14 @@ Please note that this module is logging via Log::Any.
 =head2 new
 
 Instance a new object. Takes no parameter.
+
+=head2 typedefPerScope($self)
+
+Returns the list of known typedefs per scope. At the end of processing a source code, only scope 0 still exist. The output is a reference to an array, file-level scope being at index 0. At each indice, there is a reference to a hash with typedef name as a key, value is useless.
+
+=head2 enumAnyScope($self)
+
+Returns the list of known enums. Enums has no scope level: as soon as the parser sees an enum, it available at any level. The output is a reference to a hash with enumeration name as a key, value is useless.
 
 =head2 parseEnterScope($self)
 
@@ -287,13 +313,13 @@ Leave current scope if delay flag is set and not yet done.
 
 Leave current scope.
 
-=head2 parseEnterTypedef($self, $token)
+=head2 parseEnterTypedef($self, $token, $data)
 
-Declare a new typedef with name $token, that will be visible until current scope is left.
+Declare a new typedef with name $token, that will be visible until current scope is left. $data is an optional user-data area, defaulting to 1 if not specified.
 
 =head2 parseEnterEnum($self, $token)
 
-Declare a new enum with name $token, that will be visible at any scope from now on.
+Declare a new enum with name $token, that will be visible at any scope from now on. $data is an optional user-data area, defaulting to 1 if not specified.
 
 =head2 parseObscureTypedef($self, $token)
 
@@ -310,20 +336,6 @@ Return a true value if $token is an enum.
 =head1 AUTHOR
 
 Jean-Damien Durand <jeandamiendurand@free.fr>
-
-=head1 CONTRIBUTORS
-
-=over 4
-
-=item *
-
-Jeffrey Kegler <jkegl@cpan.org>
-
-=item *
-
-jddurand <jeandamiendurand@free.fr>
-
-=back
 
 =head1 COPYRIGHT AND LICENSE
 

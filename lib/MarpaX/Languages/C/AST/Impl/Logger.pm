@@ -9,7 +9,7 @@ use diagnostics;
 use Carp;
 use Log::Any;
 
-our $VERSION = '0.19'; # VERSION
+our $VERSION = '0.20'; # TRIAL VERSION
 
 sub BEGIN {
     #
@@ -74,7 +74,7 @@ MarpaX::Languages::C::AST::Impl::Logger - Log::Any implementation on top of Marp
 
 =head1 VERSION
 
-version 0.19
+version 0.20
 
 =head1 DESCRIPTION
 
@@ -87,20 +87,6 @@ L<Log::Any>, L<http://osdir.com/ml/lang.perl.modules.log4perl.devel/2007-03/msg0
 =head1 AUTHOR
 
 Jean-Damien Durand <jeandamiendurand@free.fr>
-
-=head1 CONTRIBUTORS
-
-=over 4
-
-=item *
-
-Jeffrey Kegler <jkegl@cpan.org>
-
-=item *
-
-jddurand <jeandamiendurand@free.fr>
-
-=back
 
 =head1 COPYRIGHT AND LICENSE
 

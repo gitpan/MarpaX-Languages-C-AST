@@ -13,7 +13,7 @@ use MarpaX::Languages::C::AST::Impl qw//;
 use MarpaX::Languages::C::AST::Scope qw//;
 use MarpaX::Languages::C::AST::Callback::Events qw//;
 
-our $VERSION = '0.19'; # VERSION
+our $VERSION = '0.20'; # TRIAL VERSION
 
 
 # ----------------------------------------------------------------------------------------
@@ -99,7 +99,7 @@ sub parse {
     $self->_getLexeme(\%lexeme);
     $self->_doScope(\%lexeme);
     $self->_doEvents();
-    $pos += $self->_doPauseAfterLexeme(\%lexeme);
+    $pos += $self->_doPauseBeforeLexeme(\%lexeme);
     $self->_doLogInfo(\%lexeme);
     $self->_doLexemeCallback(\%lexeme);
     $self->_doPreprocessing($pos);
@@ -112,6 +112,15 @@ sub parse {
 
   return $self;
 }
+
+# ----------------------------------------------------------------------------------------
+
+sub scope {
+  my ($self) = @_;
+
+  return $self->{_scope};
+}
+
 
 # ----------------------------------------------------------------------------------------
 sub _show_last_expression {
@@ -177,7 +186,7 @@ sub _getLexeme {
   #
   # Get paused lexeme
   # Trustable if pause after
-  # See _doPauseAfterLexeme for the others
+  # See _doPauseBeforeLexeme for the others
   #
   my $lexeme = $self->{_impl}->pause_lexeme();
   if (defined($lexeme)) {
@@ -191,7 +200,7 @@ sub _getLexeme {
 sub _doLogInfo {
   my ($self, $lexemeHashp) = @_;
 
-  if (exists($lexemeHashp->{name}) && exists($self->{_logInfo}->{$lexemeHashp->{name}})) {
+  if (exists($lexemeHashp->{name}) && (exists($self->{_logInfo}->{$lexemeHashp->{name}}) || exists($self->{_logInfo}->{__ALL__}))) {
       if ($log->is_info) {
 	  $log->infof("[%8d:%3d] %-30s %s", $lexemeHashp->{line}, $lexemeHashp->{column}, $lexemeHashp->{name}, $lexemeHashp->{value});
       }
@@ -366,7 +375,7 @@ sub _doScope {
   }
 }
 # ----------------------------------------------------------------------------------------
-sub _doPauseAfterLexeme {
+sub _doPauseBeforeLexeme {
   my ($self, $lexemeHashp) = @_;
 
   my $delta = 0;
@@ -376,7 +385,7 @@ sub _doPauseAfterLexeme {
   #
   if (exists($lexemeHashp->{name})) {
       #
-      # pause start lexemes
+      # C grammar typedef/enumeration_constant/identifier ambiguity
       #
       if ($lexemeHashp->{name} eq 'TYPEDEF_NAME' ||
           $lexemeHashp->{name} eq 'ENUMERATION_CONSTANT' ||
@@ -412,8 +421,8 @@ sub _doPauseAfterLexeme {
 	  # A lexeme_read() can generate an event
 	  #
 	  $self->_doEvents();
-      }
-  }
+        }
+    }
 
   return $delta;
 }
@@ -433,7 +442,7 @@ MarpaX::Languages::C::AST - Translate a C source to an AST
 
 =head1 VERSION
 
-version 0.19
+version 0.20
 
 =head1 SYNOPSIS
 
@@ -528,6 +537,10 @@ String containing lexeme value.
 =head2 parse($self, $sourcep)
 
 Do the parsing. Takes as parameter the reference to a C source code. Returns $self, so that chaining with value method will be natural, i.e. parse()->value().
+
+=head2 scope($self)
+
+Returns the MarpaX::Languages::C::AST::Scope object.
 
 =head2 value($self, $optionalArrayOfValuesb)
 

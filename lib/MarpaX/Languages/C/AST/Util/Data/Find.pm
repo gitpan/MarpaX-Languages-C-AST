@@ -8,7 +8,7 @@ use Carp qw/croak/;
 
 # ABSTRACT: Find data in C AST
 
-our $VERSION = '0.19'; # VERSION
+our $VERSION = '0.20'; # TRIAL VERSION
 
 
 sub new {
@@ -17,7 +17,7 @@ sub new {
   my $self  = {
     _wanted => $options{wanted} || sub {return 1;},
     _wantedArgs => $options{wantedArgs} || [],
-    _callback => $options{callback} || [ sub {} ],
+    _callback => $options{callback} || sub {},
     _callbackArgs => $options{callbackArgs} || []
   };
 
@@ -30,10 +30,12 @@ sub new {
 sub process {
     my ($self, $value) = @_;
 
-    my @worklist = ( $value );
+    my @worklist = ($value);
+    my $rc = 0;
     do {
 	my $obj = shift @worklist;
 	if ($self->{_wanted}(@{$self->{_wantedArgs}}, $obj)) {
+	    $rc = 1;
 	    $self->{_callback}(@{$self->{_callbackArgs}}, $obj);
 	}
 	my $ref_type = ref $obj;
@@ -43,6 +45,8 @@ sub process {
 	    croak "Unsupported object type $ref_type\n" if $ref_type;
 	}
   } while (@worklist);
+
+  return $rc;
 }
 
 
@@ -60,7 +64,7 @@ MarpaX::Languages::C::AST::Util::Data::Find - Find data in C AST
 
 =head1 VERSION
 
-version 0.19
+version 0.20
 
 =head1 SYNOPSIS
 
@@ -89,7 +93,7 @@ This modules is a minimalist Data::Find designed for the parse tree values of Ma
 
 =head1 SUBROUTINES/METHODS
 
-=head2 new([%options])
+=head2 new($class, %options)
 
 Instance a new object. Takes as optional argument a hash that may contain the following key/values:
 
@@ -113,9 +117,9 @@ Process callback arguments (ARRAY ref). The process callback is called like: &$c
 
 =back
 
-=head2 new()
+=head2 process($self, $value)
 
-Instance a new object. Takes one argument: a parse tree value as returned by Marpa.
+Process search on the object $value. Returns a true value is something wanted was found.
 
 =head1 SEE ALSO
 
@@ -124,20 +128,6 @@ Instance a new object. Takes one argument: a parse tree value as returned by Mar
 =head1 AUTHOR
 
 Jean-Damien Durand <jeandamiendurand@free.fr>
-
-=head1 CONTRIBUTORS
-
-=over 4
-
-=item *
-
-Jeffrey Kegler <jkegl@cpan.org>
-
-=item *
-
-jddurand <jeandamiendurand@free.fr>
-
-=back
 
 =head1 COPYRIGHT AND LICENSE
 

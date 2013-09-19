@@ -8,7 +8,7 @@ package MarpaX::Languages::C::AST::Grammar;
 use MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011;
 use Carp qw/croak/;
 
-our $VERSION = '0.19'; # VERSION
+our $VERSION = '0.20'; # TRIAL VERSION
 
 
 sub new {
@@ -61,7 +61,7 @@ MarpaX::Languages::C::AST::Grammar - C grammar written in Marpa BNF
 
 =head1 VERSION
 
-version 0.19
+version 0.20
 
 =head1 SYNOPSIS
 
@@ -83,19 +83,27 @@ ISO-ANSI-C-2011. The ISO grammar of ANSI C 2011, as of L<http://www.quut.com/c/A
 
 =head1 SUBROUTINES/METHODS
 
-=head2 new($grammarName, ...)
+=head2 new($class, $grammarName)
 
-Instance a new object. Takes the name of the grammar as argument. Remaining arguments are passed to the sub grammar method.
+Instance a new object. Takes the name of the grammar as argument. Remaining arguments are passed to the sub grammar method. Supported grammars are:
 
-=head2 content()
+=over
+
+=item ISO-ANSI-C-2011
+
+ISO ANSI C 2011, with GNU and MSVS extensions
+
+=back
+
+=head2 content($self)
 
 Returns the content of the grammar.
 
-=head2 grammar_option()
+=head2 grammar_option($self)
 
 Returns recommended option for Marpa::R2::Scanless::G->new(), returned as a reference to a hash.
 
-=head2 recce_option()
+=head2 recce_option($self)
 
 Returns recommended option for Marpa::R2::Scanless::R->new(), returned as a reference to a hash.
 
@@ -106,20 +114,6 @@ L<Marpa::R2>, L<MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011>
 =head1 AUTHOR
 
 Jean-Damien Durand <jeandamiendurand@free.fr>
-
-=head1 CONTRIBUTORS
-
-=over 4
-
-=item *
-
-Jeffrey Kegler <jkegl@cpan.org>
-
-=item *
-
-jddurand <jeandamiendurand@free.fr>
-
-=back
 
 =head1 COPYRIGHT AND LICENSE
 

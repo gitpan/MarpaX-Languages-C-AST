@@ -32,6 +32,9 @@ lib/MarpaX/Languages/C/AST/Util.pm
 lib/MarpaX/Languages/C/AST/Util/Data/Find.pm
 t/00-compile.t
 t/00-report-prereqs.t
+t/discard_GCC_attribute.t
+t/discard_MSVS_declspec.t
+t/discard_MSVS_pragma.t
 t/failure-function-definition-declaration-list-02.t
 t/failure-function-definition-declaration-list.t
 t/failure-function-definition-declaration-specifiers-02.t
