@@ -20,7 +20,7 @@ autoflush STDOUT 1;
 
 # ABSTRACT: C source analysis
 
-our $VERSION = '0.20'; # TRIAL VERSION
+our $VERSION = '0.21'; # VERSION
 
 # PODNAME: c2ast.pl
 
@@ -416,7 +416,7 @@ c2ast.pl - C source analysis
 
 =head1 VERSION
 
-version 0.20
+version 0.21
 
 =head1 DESCRIPTION
 

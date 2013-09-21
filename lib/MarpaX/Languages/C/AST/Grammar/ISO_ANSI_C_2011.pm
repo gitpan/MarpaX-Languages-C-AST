@@ -7,7 +7,7 @@ use Carp qw/croak/;
 
 # ABSTRACT: ISO ANSI C 2011 grammar written in Marpa BNF
 
-our $VERSION = '0.20'; # TRIAL VERSION
+our $VERSION = '0.21'; # VERSION
 
 
 our %DEFAULT_PAUSE = (
@@ -106,7 +106,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011 - ISO ANSI C 2011 grammar wr
 
 =head1 VERSION
 
-version 0.20
+version 0.21
 
 =head1 SYNOPSIS
 
@@ -1226,8 +1226,8 @@ MSVS_ASM_XOR ~ 'xor'
 #:lexeme ~ <MSVS_ASM_SHORT>               priority => -60
 #MSVS_ASM_SHORT ~ 'SHORT'
 :lexeme ~ <MSVS_ASM_TYPE>                priority => -60
-MSVS_ASM_TYPE ~ '.TYPE'
-MSVS_ASM_TYPE ~ '.type'
+MSVS_ASM_TYPE ~ 'TYPE'
+MSVS_ASM_TYPE ~ 'type'
 #:lexeme ~ <MSVS_ASM_OPATTR>              priority => -60
 #MSVS_ASM_OPATTR ~ 'OPATTR'
 :lexeme ~ <MSVS_ASM_STAR>                priority => -60
@@ -1636,7 +1636,7 @@ msvsAsmMnemonic ::= IDENTIFIER | MSVS_ASM_AND | MSVS_ASM_MOD | MSVS_ASM_NOT | MS
 
 #
 # msvsAsmExpr ::=   MSVS_ASM_SHORT  msvsAsmExpr05
-#                   | MSVS_ASM_TYPE  msvsAsmExpr01
+#                   | msvsAsmDotType  msvsAsmExpr01
 #                   | MSVS_ASM_OPATTR msvsAsmExpr01
 #                   | msvsAsmExpr01
 #
@@ -1684,10 +1684,16 @@ msvsAsmExpr08 ::=   MSVS_ASM_HIGH     msvsAsmExpr09
                     | MSVS_ASM_LOWWORD  msvsAsmExpr09
                     | msvsAsmExpr09
 
+#
+# .type could eat C lexemes DOT and IDENTIFIER. Since we do not really mind about
+# MSVS __asm accuracy, this is splitted explicitely into '.' and '.type'
+#
+msvsAsmDotType ::= MSVS_ASM_DOT MSVS_ASM_TYPE
+
 msvsAsmExpr09 ::=   MSVS_ASM_OFFSET   msvsAsmExpr10
                     | MSVS_ASM_SEG      msvsAsmExpr10
                     | MSVS_ASM_LROFFSET msvsAsmExpr10
-                    | MSVS_ASM_TYPE     msvsAsmExpr10
+                    | msvsAsmDotType    msvsAsmExpr10
                     | MSVS_ASM_THIS     msvsAsmExpr10
                     | msvsAsmExpr09 MSVS_ASM_PTR msvsAsmExpr10
                     | msvsAsmExpr09 MSVS_ASM_COLON   msvsAsmExpr10
