@@ -30,7 +30,6 @@ my @modules = qw(
   POSIX
   SUPER
   Scalar::Util
-  Storable
   Term::ProgressBar
   Test::More
   Test::Trap

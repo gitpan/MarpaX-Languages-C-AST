@@ -7,7 +7,7 @@ use Carp qw/croak/;
 
 # ABSTRACT: ISO ANSI C 2011 grammar written in Marpa BNF
 
-our $VERSION = '0.21'; # VERSION
+our $VERSION = '0.22'; # VERSION
 
 
 our %DEFAULT_PAUSE = (
@@ -106,7 +106,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011 - ISO ANSI C 2011 grammar wr
 
 =head1 VERSION
 
-version 0.21
+version 0.22
 
 =head1 SYNOPSIS
 
@@ -175,12 +175,8 @@ lexeme default = action => [start,length,value]
 #
 :start ::= translationUnit
 
-event 'primaryExpressionIdentifier$' = completed <primaryExpressionIdentifier>
-primaryExpressionIdentifier
-	::= IDENTIFIER
-
 primaryExpression
-	::= primaryExpressionIdentifier
+	::= IDENTIFIER
 	| constant
 	| string
 	| LPAREN expression RPAREN
@@ -195,7 +191,7 @@ constant
 
 event 'enumerationConstantIdentifier$' = completed <enumerationConstantIdentifier>
 enumerationConstantIdentifier  # before it has been defined as such
-	::= IDENTIFIER
+	::= IDENTIFIER_UNAMBIGUOUS
 
 enumerationConstant            # before it has been defined as such
 	::= enumerationConstantIdentifier
@@ -226,8 +222,8 @@ postfixExpression
         | gccBuiltinVaEnd
         | gccBuiltinVaArg
         | gccBuiltinOffsetof
-	| postfixExpression DOT IDENTIFIER
-	| postfixExpression PTR_OP IDENTIFIER
+	| postfixExpression DOT IDENTIFIER_UNAMBIGUOUS
+	| postfixExpression PTR_OP IDENTIFIER_UNAMBIGUOUS
 	| postfixExpression INC_OP
 	| postfixExpression DEC_OP
 	| LPAREN typeName RPAREN LCURLY initializerList RCURLY
@@ -311,14 +307,24 @@ logicalOrExpression
 	::= logicalAndExpression
 	| logicalOrExpression OR_OP logicalAndExpression
 
+#
+# Following yafce: in C grammar they put conditionalExpression, but in fact it must be
+# assignmentExpression, otherwise pnp ? x : x = 0x388;
+# C.f. http://padator.org/software/project-yacfe/
+#
 conditionalExpression
 	::= logicalOrExpression
-	| logicalOrExpression QUESTION_MARK expression COLON conditionalExpression
-	| logicalOrExpression QUESTION_MARK COLON conditionalExpression          # GCC Extension
+	| logicalOrExpression QUESTION_MARK expression COLON assignmentExpression
+	| logicalOrExpression QUESTION_MARK COLON assignmentExpression          # GCC Extension
 
+#
+# Following yafce: in C grammar they put unaryExpression, but in fact it must be
+# castExpression, otherwise (int * ) xxx = &yy; is not allowed
+# C.f. http://padator.org/software/project-yacfe/
+#
 assignmentExpression
 	::= conditionalExpression
-	| unaryExpression assignmentOperator assignmentExpression
+	| castExpression assignmentOperator assignmentExpression
 
 assignmentOperator
 	::= EQUAL
@@ -462,8 +468,8 @@ structContextEnd ::=
 
 structOrUnionSpecifier
 	::= structOrUnion LCURLY <structContextStart> structDeclarationList RCURLY <structContextEnd>
-	| structOrUnion IDENTIFIER LCURLY <structContextStart> structDeclarationList RCURLY <structContextEnd>
-	| structOrUnion IDENTIFIER
+	| structOrUnion IDENTIFIER_UNAMBIGUOUS LCURLY <structContextStart> structDeclarationList RCURLY <structContextEnd>
+	| structOrUnion IDENTIFIER_UNAMBIGUOUS
 
 structOrUnion
 	::= STRUCT
@@ -517,9 +523,9 @@ structDeclarator
 enumSpecifier
 	::= ENUM LCURLY enumeratorList RCURLY
 	| ENUM LCURLY enumeratorList COMMA RCURLY
-	| ENUM IDENTIFIER LCURLY enumeratorList RCURLY
-	| ENUM IDENTIFIER LCURLY enumeratorList COMMA RCURLY
-	| ENUM IDENTIFIER
+	| ENUM IDENTIFIER_UNAMBIGUOUS LCURLY enumeratorList RCURLY
+	| ENUM IDENTIFIER_UNAMBIGUOUS LCURLY enumeratorList COMMA RCURLY
+	| ENUM IDENTIFIER_UNAMBIGUOUS
 
 enumeratorList
 	::= enumerator
@@ -673,7 +679,7 @@ designatorList ::= designator+
 
 designator
 	::= LBRACKET constantExpression RBRACKET
-	| DOT IDENTIFIER
+	| DOT IDENTIFIER_UNAMBIGUOUS
         | LBRACKET constantExpression ELLIPSIS constantExpression RBRACKET # GCC Extension
 
 staticAssertDeclaration
@@ -722,7 +728,7 @@ iterationStatement
 	| FOR LPAREN declaration expressionStatement expression RPAREN statement
 
 jumpStatement
-	::= GOTO IDENTIFIER SEMICOLON
+	::= GOTO IDENTIFIER_UNAMBIGUOUS SEMICOLON
 	| CONTINUE SEMICOLON
 	| BREAK SEMICOLON
 	| RETURN SEMICOLON
@@ -939,9 +945,11 @@ FUNC_NAME     ~ '__func__'
 :lexeme ~ <TYPEDEF_NAME>         priority => -100
 :lexeme ~ <ENUMERATION_CONSTANT> priority => -100
 :lexeme ~ <IDENTIFIER>           priority => -100
-TYPEDEF_NAME         ~ L A_any
-ENUMERATION_CONSTANT ~ L A_any
-IDENTIFIER           ~ L A_any
+_IDENTIFIER          ~ L A_any
+TYPEDEF_NAME         ~ _IDENTIFIER
+ENUMERATION_CONSTANT ~ _IDENTIFIER
+IDENTIFIER           ~ _IDENTIFIER
+IDENTIFIER_UNAMBIGUOUS ~ _IDENTIFIER
 
 :lexeme ~ <I_CONSTANT>         priority => -101
 I_CONSTANT ~ HP H_many IS_maybe
@@ -1532,10 +1540,10 @@ gccAsmInnerOperandList ::= COLON
                          | COLON gccAsmOperandList gccAsmInnerOperandList2
 
 gccAsmInnerLabelList ::= COLON
-                       | COLON IDENTIFIER
-                       | gccAsmInnerLabelList COMMA IDENTIFIER
+                       | COLON IDENTIFIER_UNAMBIGUOUS
+                       | gccAsmInnerLabelList COMMA IDENTIFIER_UNAMBIGUOUS
 
-gccAsmOperandPrefix ::= LBRACKET IDENTIFIER RBRACKET
+gccAsmOperandPrefix ::= LBRACKET IDENTIFIER_UNAMBIGUOUS RBRACKET
 
 gccAsmOperand ::= string LPAREN expression RPAREN
                 | gccAsmOperandPrefix string LPAREN expression RPAREN
@@ -1573,8 +1581,8 @@ gccTypeof ::= GCC_TYPEOF LPAREN typeName RPAREN
 
 gccBuiltinOffsetof ::= GCC_BUILTIN_OFFSETOF LPAREN typeName COMMA offsetofMemberDesignator RPAREN
 
-offsetofMemberDesignator ::=   IDENTIFIER
-                               | offsetofMemberDesignator DOT IDENTIFIER
+offsetofMemberDesignator ::=   IDENTIFIER_UNAMBIGUOUS
+                               | offsetofMemberDesignator DOT IDENTIFIER_UNAMBIGUOUS
                                | offsetofMemberDesignator LBRACKET expression RBRACKET
 
 #
@@ -1599,8 +1607,8 @@ msvsAsmDirective ::= msvsAsmLabelDef msvsAsmSegmentDirective
                    | msvsAsmSegmentDirective
                    | msvsAsmLabelDef
 
-msvsAsmLabelDef ::= IDENTIFIER COLON
-                  | IDENTIFIER COLON COLON
+msvsAsmLabelDef ::= IDENTIFIER_UNAMBIGUOUS COLON
+                  | IDENTIFIER_UNAMBIGUOUS COLON COLON
                   | MSVS_AT MSVS_AT COLON
 
 #
@@ -1632,7 +1640,7 @@ msvsAsmInstruction ::= msvsAsmInstrPrefix msvsAsmMnemonic msvsAsmExprList
 
 msvsAsmInstrPrefix ::= MSVS_ASM_REP | MSVS_ASM_REPE | MSVS_ASM_REPZ | MSVS_ASM_REPNE | MSVS_ASM_REPNZ | MSVS_ASM_LOCK
 
-msvsAsmMnemonic ::= IDENTIFIER | MSVS_ASM_AND | MSVS_ASM_MOD | MSVS_ASM_NOT | MSVS_ASM_OR | MSVS_ASM_SEG | MSVS_ASM_SHL | MSVS_ASM_SHLD | MSVS_ASM_MOV | MSVS_ASM_SHR | MSVS_ASM_XOR
+msvsAsmMnemonic ::= IDENTIFIER_UNAMBIGUOUS | MSVS_ASM_AND | MSVS_ASM_MOD | MSVS_ASM_NOT | MSVS_ASM_OR | MSVS_ASM_SEG | MSVS_ASM_SHL | MSVS_ASM_SHLD | MSVS_ASM_MOV | MSVS_ASM_SHR | MSVS_ASM_XOR
 
 #
 # msvsAsmExpr ::=   MSVS_ASM_SHORT  msvsAsmExpr05
@@ -1685,7 +1693,7 @@ msvsAsmExpr08 ::=   MSVS_ASM_HIGH     msvsAsmExpr09
                     | msvsAsmExpr09
 
 #
-# .type could eat C lexemes DOT and IDENTIFIER. Since we do not really mind about
+# .type could eat C lexemes DOT and IDENTIFIER_UNAMBIGUOUS. Since we do not really mind about
 # MSVS __asm accuracy, this is splitted explicitely into '.' and '.type'
 #
 msvsAsmDotType ::= MSVS_ASM_DOT MSVS_ASM_TYPE
@@ -1706,17 +1714,17 @@ msvsAsmExpr10 ::=   msvsAsmExpr10 MSVS_ASM_DOT msvsAsmExpr11
 #
 # msvsAsmExpr11 ::=   LPAREN msvsAsmExpr RPAREN
 #                     | MSVS_ASM_LBRACKET msvsAsmExpr MSVS_ASM_RBRACKET
-#                     | MSVS_ASM_WIDTH IDENTIFIER
-#                     | MSVS_ASM_MASK  IDENTIFIER
+#                     | MSVS_ASM_WIDTH IDENTIFIER_UNAMBIGUOUS
+#                     | MSVS_ASM_MASK  IDENTIFIER_UNAMBIGUOUS
 #                     | MSVS_ASM_SIZE    msvsAsmSizeArg
 #                     | MSVS_ASM_SIZEOF  msvsAsmSizeArg
-#                     | MSVS_ASM_LENGTH   IDENTIFIER
-#                     | MSVS_ASM_LENGTHOF IDENTIFIER
+#                     | MSVS_ASM_LENGTH   IDENTIFIER_UNAMBIGUOUS
+#                     | MSVS_ASM_LENGTHOF IDENTIFIER_UNAMBIGUOUS
 #                     | msvsAsmEecordConst
 #                     | msvsAsmString
 #                     | msvsAsmConstant
 #                     | msvsAsmType
-#                     | IDENTIFIER
+#                     | IDENTIFIER_UNAMBIGUOUS
 #                     | MSVS_ASM_DOLLAR
 #                     | msvsAsmSegmentRegister
 #                     | msvsAsmRegister
@@ -1729,12 +1737,12 @@ msvsAsmExpr11 ::=   LPAREN msvsAsmExpr RPAREN
                     | MSVS_ASM_LBRACKET msvsAsmExpr MSVS_ASM_RBRACKET
                     | msvsAsmConstant
                     | msvsAsmType
-                    | IDENTIFIER
+                    | IDENTIFIER_UNAMBIGUOUS
                     | MSVS_ASM_DOLLAR
                     | msvsAsmSegmentRegister
                     | msvsAsmRegister
 
-msvsAsmType ::=   IDENTIFIER
+msvsAsmType ::=   IDENTIFIER_UNAMBIGUOUS
                   | msvsAsmDistance
                   | msvsAsmDataType
 
@@ -1788,7 +1796,7 @@ msvsAsmConstant ::= I_CONSTANT
 #####################
 # G0 specific "tools"
 #####################
-<G0 identifier> ~ WS_any L A_any WS_any
+<G0 identifier> ~ WS_any _IDENTIFIER WS_any
 <_G0 number> ~ [\d]+
 <G0 number> ~ WS_any <_G0 number> WS_any
 <G0 string unit> ~ WS_any '"' STRING_LITERAL_INSIDE_any '"' WS_any

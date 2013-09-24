@@ -8,14 +8,13 @@ use parent qw/MarpaX::Languages::C::AST::Callback/;
 # ABSTRACT: Events callback when translating a C source to an AST
 
 use Carp qw/croak/;
-use Storable qw/dclone/;
 use SUPER;
 use constant LHS_RESET_EVENT => '<reset>';
 use constant LHS_PROCESS_EVENT => '<process>';
 use constant CLOSEANYSCOPE_PRIORITY => -1000;
 use constant RESETANYDATA_PRIORITY => -2000;
 
-our $VERSION = '0.21'; # VERSION
+our $VERSION = '0.22'; # VERSION
 
 
 sub new {
@@ -778,7 +777,7 @@ MarpaX::Languages::C::AST::Callback::Events - Events callback when translating a
 
 =head1 VERSION
 
-version 0.21
+version 0.22
 
 =head1 DESCRIPTION
 

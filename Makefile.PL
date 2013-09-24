@@ -37,7 +37,6 @@ my %WriteMakefileArgs = (
     "POSIX" => 0,
     "SUPER" => 0,
     "Scalar::Util" => 0,
-    "Storable" => 0,
     "Term::ProgressBar" => 0,
     "constant" => 0,
     "diagnostics" => 0,
@@ -55,7 +54,7 @@ my %WriteMakefileArgs = (
     "Test::More" => 0,
     "Test::Trap" => 0
   },
-  "VERSION" => "0.21",
+  "VERSION" => "0.22",
   "test" => {
     "TESTS" => "t/*.t"
   }
