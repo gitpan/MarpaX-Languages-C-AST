@@ -46,6 +46,7 @@ my %WriteMakefileArgs = (
   },
   "TEST_REQUIRES" => {
     "ExtUtils::MakeMaker" => 0,
+    "File::Spec" => 0,
     "File::Spec::Functions" => 0,
     "File::Temp" => 0,
     "IO::Handle" => 0,
@@ -54,7 +55,7 @@ my %WriteMakefileArgs = (
     "Test::More" => 0,
     "Test::Trap" => 0
   },
-  "VERSION" => "0.22",
+  "VERSION" => "0.23",
   "test" => {
     "TESTS" => "t/*.t"
   }

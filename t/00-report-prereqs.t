@@ -16,6 +16,7 @@ my @modules = qw(
   Exporter
   ExtUtils::MakeMaker
   File::Basename
+  File::Spec
   File::Spec::Functions
   File::Temp
   Getopt::Long
