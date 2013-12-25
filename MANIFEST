@@ -42,6 +42,7 @@ t/failure-function-definition-declaration-specifiers.t
 t/failure-parameter-declaration-02.t
 t/failure-parameter-declaration.t
 t/gcc-asm.t
+t/gcc_extension.t
 t/if-if-else.data
 t/if-if-else.t
 t/syntax-error.t

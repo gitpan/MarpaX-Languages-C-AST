@@ -55,37 +55,50 @@ my %WriteMakefileArgs = (
     "Test::More" => 0,
     "Test::Trap" => 0
   },
-  "VERSION" => "0.23",
+  "VERSION" => "0.24",
   "test" => {
     "TESTS" => "t/*.t"
   }
 );
 
 
-unless ( eval { ExtUtils::MakeMaker->VERSION(6.63_03) } ) {
-  my $tr = delete $WriteMakefileArgs{TEST_REQUIRES};
-  my $br = $WriteMakefileArgs{BUILD_REQUIRES};
-  for my $mod ( keys %$tr ) {
-    if ( exists $br->{$mod} ) {
-      $br->{$mod} = $tr->{$mod} if $tr->{$mod} > $br->{$mod};
-    }
-    else {
-      $br->{$mod} = $tr->{$mod};
-    }
-  }
-}
+my %FallbackPrereqs = (
+  "Carp" => 0,
+  "Class::Struct" => 0,
+  "Data::Dumper" => 0,
+  "Exporter" => 0,
+  "ExtUtils::MakeMaker" => 0,
+  "File::Basename" => 0,
+  "File::Spec" => 0,
+  "File::Spec::Functions" => 0,
+  "File::Temp" => 0,
+  "Getopt::Long" => 0,
+  "IO::Handle" => 0,
+  "IPC::Open3" => 0,
+  "IPC::Run" => 0,
+  "List::Util" => 0,
+  "Log::Any" => 0,
+  "Log::Any::Adapter" => 0,
+  "Log::Log4perl" => 0,
+  "Marpa::R2" => "2.064000",
+  "POSIX" => 0,
+  "SUPER" => 0,
+  "Scalar::Util" => 0,
+  "Term::ProgressBar" => 0,
+  "Test::More" => 0,
+  "Test::Trap" => 0,
+  "constant" => 0,
+  "diagnostics" => 0,
+  "parent" => 0,
+  "strict" => 0,
+  "warnings" => 0
+);
 
-unless ( eval { ExtUtils::MakeMaker->VERSION(6.56) } ) {
-  my $br = delete $WriteMakefileArgs{BUILD_REQUIRES};
-  my $pp = $WriteMakefileArgs{PREREQ_PM};
-  for my $mod ( keys %$br ) {
-    if ( exists $pp->{$mod} ) {
-      $pp->{$mod} = $br->{$mod} if $br->{$mod} > $pp->{$mod};
-    }
-    else {
-      $pp->{$mod} = $br->{$mod};
-    }
-  }
+
+unless ( eval { ExtUtils::MakeMaker->VERSION(6.63_03) } ) {
+  delete $WriteMakefileArgs{TEST_REQUIRES};
+  delete $WriteMakefileArgs{BUILD_REQUIRES};
+  $WriteMakefileArgs{PREREQ_PM} = \%FallbackPrereqs;
 }
 
 delete $WriteMakefileArgs{CONFIGURE_REQUIRES}
