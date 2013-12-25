@@ -2,7 +2,7 @@ NAME
     MarpaX::Languages::C::AST - Translate a C source to an AST
 
 VERSION
-    version 0.24
+    version 0.25
 
 SYNOPSIS
         use strict;
