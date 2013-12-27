@@ -27,6 +27,7 @@ my %WriteMakefileArgs = (
     "Data::Dumper" => 0,
     "Exporter" => 0,
     "File::Basename" => 0,
+    "File::Spec" => 0,
     "Getopt::Long" => 0,
     "IO::Handle" => 0,
     "IPC::Run" => 0,
@@ -55,7 +56,7 @@ my %WriteMakefileArgs = (
     "Test::More" => 0,
     "Test::Trap" => 0
   },
-  "VERSION" => "0.25",
+  "VERSION" => "0.26",
   "test" => {
     "TESTS" => "t/*.t"
   }

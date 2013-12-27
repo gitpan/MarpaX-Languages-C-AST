@@ -1,4 +1,4 @@
-#!env perl
+#!/usr/bin/perl
 use strict;
 use warnings FATAL => 'all';
 use diagnostics;
@@ -15,12 +15,13 @@ use Data::Dumper;
 use Log::Log4perl qw/:easy/;
 use Log::Any::Adapter;
 use Log::Any qw/$log/;
+use File::Spec;
 
 autoflush STDOUT 1;
 
 # ABSTRACT: C source analysis
 
-our $VERSION = '0.25'; # VERSION
+our $VERSION = '0.26'; # VERSION
 
 # PODNAME: c2ast.pl
 
@@ -91,7 +92,7 @@ if ($cppdup) {
 # -----------------
 # Callback argument
 # -----------------
-my %lexemeCallbackHash = (file => $cppfile,
+my %lexemeCallbackHash = (file => File::Spec->canonpath($cppfile),
 			  lexeme => {},
 			  internalLexeme => {},
 			  progress => undef,
@@ -266,10 +267,10 @@ sub lexemeCallback {
 	if ($lexemeHashp->{value} =~ /([\d]+)\s*\"([^\"]+)\"/) {
 	    $lexemeCallbackHashp->{curline} = substr($lexemeHashp->{value}, $-[1], $+[1] - $-[1]);
 	    $lexemeCallbackHashp->{curline_real} = $lexemeHashp->{line};
-	    $lexemeCallbackHashp->{curfile} = substr($lexemeHashp->{value}, $-[2], $+[2] - $-[2]);
+	    $lexemeCallbackHashp->{curfile} = File::Spec->canonpath(substr($lexemeHashp->{value}, $-[2], $+[2] - $-[2]));
 	    $lexemeCallbackHashp->{allfiles}->{$lexemeCallbackHashp->{curfile}}++;
 	    if (! $lexemeCallbackHashp->{file}) {
-		$lexemeCallbackHashp->{file} = $lexemeCallbackHashp->{curfile};
+		$lexemeCallbackHashp->{file} = File::Spec->canonpath($lexemeCallbackHashp->{curfile});
 	    }
 	    if (! defined($lexemeCallbackHashp->{tryToAlignMax})) {
 		$lexemeCallbackHashp->{tryToAlignMax} = length(sprintf('%s(%d)', $lexemeCallbackHashp->{file}, 1000000)); # a pretty good max -;
@@ -293,7 +294,7 @@ sub lexemeCallback {
 	    my $line = $lexemeCallbackHashp->{curline} + ($lexemeHashp->{line} - $lexemeCallbackHashp->{curline_real} - 1);
 	    $lexemeCallbackHashp->{position2line}->{$lexemeHashp->{start}} = $line;
 	    if (exists($lexemeCallbackHashp->{lexeme}->{$lexemeHashp->{name}})) {
-		my $tryToAlign = sprintf('%s(%d)', $lexemeCallbackHashp->{curfile}, $line);
+		my $tryToAlign = sprintf('%s(%d)', $lexemeCallbackHashp->{file}, $line);
 		printf "%-*s %-30s %s\n", $lexemeCallbackHashp->{tryToAlignMax}, $tryToAlign, $lexemeHashp->{name}, $lexemeHashp->{value};
 	    }
 	}
@@ -413,7 +414,7 @@ c2ast.pl - C source analysis
 
 =head1 VERSION
 
-version 0.25
+version 0.26
 
 =head1 DESCRIPTION
 

@@ -13,7 +13,7 @@ use MarpaX::Languages::C::AST::Impl qw//;
 use MarpaX::Languages::C::AST::Scope qw//;
 use MarpaX::Languages::C::AST::Callback::Events qw//;
 
-our $VERSION = '0.25'; # VERSION
+our $VERSION = '0.26'; # VERSION
 
 
 # ----------------------------------------------------------------------------------------
@@ -232,7 +232,7 @@ sub _doPreprocessing {
     #
     my $previous = pos(${$self->{_sourcep}});
     my $delta = 0;
-    my $line = 0;
+    my $line = 1;
     if ($pos > $[) {
       my $line_columnp = lineAndCol($self->{_impl});
       $line = $line_columnp->[0];
@@ -270,7 +270,7 @@ sub _doPreprocessing {
         #
         $line += ($pre =~ tr/\n//);
 	#
-	# If this is a #line, fake an callback event PREPROCESSOR_LINE_DIRECTIVE
+	# If this is a #line, fake a callback event PREPROCESSOR_LINE_DIRECTIVE
 	#
 	if ($directive eq 'line' || $directive =~ /^\d+$/) {
 	    my %lexeme = ();
@@ -442,7 +442,7 @@ MarpaX::Languages::C::AST - Translate a C source to an AST
 
 =head1 VERSION
 
-version 0.25
+version 0.26
 
 =head1 SYNOPSIS
 
