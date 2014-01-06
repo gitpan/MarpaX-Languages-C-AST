@@ -7,7 +7,7 @@ use Carp qw/croak/;
 
 # ABSTRACT: ISO ANSI C 2011 grammar written in Marpa BNF
 
-our $VERSION = '0.26'; # VERSION
+our $VERSION = '0.27'; # TRIAL VERSION
 
 
 our %DEFAULT_PAUSE = (
@@ -106,7 +106,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011 - ISO ANSI C 2011 grammar wr
 
 =head1 VERSION
 
-version 0.26
+version 0.27
 
 =head1 SYNOPSIS
 

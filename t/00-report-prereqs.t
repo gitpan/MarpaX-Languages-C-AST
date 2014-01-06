@@ -12,6 +12,7 @@ use File::Spec::Functions;
 use List::Util qw/max/;
 
 my @modules = qw(
+  C::Scan
   CPAN::Meta
   CPAN::Meta::Requirements
   Carp
@@ -24,7 +25,9 @@ my @modules = qw(
   File::Spec::Functions
   File::Temp
   Getopt::Long
+  IO::File
   IO::Handle
+  IPC::Cmd
   IPC::Open3
   IPC::Run
   List::Util
@@ -33,9 +36,12 @@ my @modules = qw(
   Log::Log4perl
   Marpa::R2
   POSIX
+  Pod::Usage
+  Regexp::Common
   SUPER
   Scalar::Util
   Term::ProgressBar
+  Test::Differences
   Test::More
   Test::Trap
   constant

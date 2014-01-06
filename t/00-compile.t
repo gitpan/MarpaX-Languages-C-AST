@@ -3,7 +3,7 @@ use warnings;
 
 # this test was generated with Dist::Zilla::Plugin::Test::Compile 2.037
 
-use Test::More  tests => 14 + ($ENV{AUTHOR_TESTING} ? 1 : 0);
+use Test::More  tests => 16 + ($ENV{AUTHOR_TESTING} ? 1 : 0);
 
 
 
@@ -16,11 +16,13 @@ my @module_files = (
     'MarpaX/Languages/C/AST/Grammar.pm',
     'MarpaX/Languages/C/AST/Grammar/ISO_ANSI_C_2011.pm',
     'MarpaX/Languages/C/AST/Grammar/ISO_ANSI_C_2011/Actions.pm',
+    'MarpaX/Languages/C/AST/Grammar/ISO_ANSI_C_2011/Scan.pm',
     'MarpaX/Languages/C/AST/Impl.pm',
     'MarpaX/Languages/C/AST/Impl/Logger.pm',
     'MarpaX/Languages/C/AST/Scope.pm',
     'MarpaX/Languages/C/AST/Util.pm',
-    'MarpaX/Languages/C/AST/Util/Data/Find.pm'
+    'MarpaX/Languages/C/AST/Util/Data/Find.pm',
+    'MarpaX/Languages/C/Scan.pm'
 );
 
 my @scripts = (
