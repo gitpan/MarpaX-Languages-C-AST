@@ -5,7 +5,7 @@ use Test::More tests => 11;
 use Test::Differences;
 use File::Spec;
 use Data::Dumper;
-use C::Scan;
+#use C::Scan;
 
 BEGIN {
     push(@INC, 'inc');
@@ -14,7 +14,7 @@ BEGIN {
 
 my $filename = File::Spec->catfile('inc', 'scan.c');
 my $c = MarpaX::Languages::C::Scan->new(filename => $filename);
-my $cscan = C::Scan->new(filename => $filename, filename_filter => $filename);
+#my $cscan = C::Scan->new(filename => $filename, filename_filter => $filename);
 
 eq_or_diff($c->defines_no_args,
           {

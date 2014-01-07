@@ -52,7 +52,7 @@ our %KEY2ID = (
 our @PURGE_KEYS = sort {$KEY2ID{$a} <=> $KEY2ID{$b}} grep {$KEY2ID{$_} >= $KEY2ID{_MAX}} keys %KEY2ID;
 our $PURGE_IDX  = $KEY2ID{$PURGE_KEYS[0]};
 
-our $VERSION = '0.28'; # TRIAL VERSION
+our $VERSION = '0.29'; # VERSION
 
 
 # ----------------------------------------------------------------------------------------
@@ -1422,7 +1422,7 @@ sub _analyseEnumSpecifier {
 	}
     }
 
-    push($self->{_decls}, $newRcp);
+    push(@{$self->{_decls}}, $newRcp);
 
     $self->_appendRcp($rcp, 'ty', $self->_getRcp($newRcp, 'nm'));
 
@@ -2789,7 +2789,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011::Scan - Scan C source
 
 =head1 VERSION
 
-version 0.28
+version 0.29
 
 =head1 SYNOPSIS
 

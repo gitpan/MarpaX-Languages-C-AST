@@ -17,7 +17,8 @@ my %WriteMakefileArgs = (
   },
   "DISTNAME" => "MarpaX-Languages-C-AST",
   "EXE_FILES" => [
-    "bin/c2ast.pl"
+    "bin/c2ast.pl",
+    "bin/cscan"
   ],
   "LICENSE" => "perl",
   "NAME" => "MarpaX::Languages::C::AST",
@@ -32,6 +33,7 @@ my %WriteMakefileArgs = (
     "Getopt::Long" => 0,
     "IO::File" => 0,
     "IO::Handle" => 0,
+    "IO::String" => 0,
     "IPC::Cmd" => 0,
     "IPC::Run" => 0,
     "Log::Any" => 0,
@@ -51,7 +53,6 @@ my %WriteMakefileArgs = (
     "warnings" => 0
   },
   "TEST_REQUIRES" => {
-    "C::Scan" => 0,
     "ExtUtils::MakeMaker" => 0,
     "File::Spec" => 0,
     "File::Spec::Functions" => 0,
@@ -63,7 +64,7 @@ my %WriteMakefileArgs = (
     "Test::More" => 0,
     "Test::Trap" => 0
   },
-  "VERSION" => "0.28",
+  "VERSION" => "0.29",
   "test" => {
     "TESTS" => "t/*.t"
   }
@@ -71,7 +72,6 @@ my %WriteMakefileArgs = (
 
 
 my %FallbackPrereqs = (
-  "C::Scan" => 0,
   "Carp" => 0,
   "Class::Struct" => 0,
   "Data::Dumper" => 0,
@@ -84,6 +84,7 @@ my %FallbackPrereqs = (
   "Getopt::Long" => 0,
   "IO::File" => 0,
   "IO::Handle" => 0,
+  "IO::String" => 0,
   "IPC::Cmd" => 0,
   "IPC::Open3" => 0,
   "IPC::Run" => 0,

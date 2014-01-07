@@ -3,7 +3,7 @@ use warnings;
 
 # this test was generated with Dist::Zilla::Plugin::Test::Compile 2.037
 
-use Test::More  tests => 16 + ($ENV{AUTHOR_TESTING} ? 1 : 0);
+use Test::More  tests => 17 + ($ENV{AUTHOR_TESTING} ? 1 : 0);
 
 
 
@@ -26,7 +26,8 @@ my @module_files = (
 );
 
 my @scripts = (
-    'bin/c2ast.pl'
+    'bin/c2ast.pl',
+    'bin/cscan'
 );
 
 # fake home for cpan-testers

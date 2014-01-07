@@ -12,7 +12,6 @@ use File::Spec::Functions;
 use List::Util qw/max/;
 
 my @modules = qw(
-  C::Scan
   CPAN::Meta
   CPAN::Meta::Requirements
   Carp
@@ -27,6 +26,7 @@ my @modules = qw(
   Getopt::Long
   IO::File
   IO::Handle
+  IO::String
   IPC::Cmd
   IPC::Open3
   IPC::Run
