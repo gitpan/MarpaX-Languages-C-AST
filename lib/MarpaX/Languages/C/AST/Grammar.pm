@@ -8,7 +8,7 @@ package MarpaX::Languages::C::AST::Grammar;
 use MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011;
 use Carp qw/croak/;
 
-our $VERSION = '0.27'; # TRIAL VERSION
+our $VERSION = '0.28'; # TRIAL VERSION
 
 
 sub new {
@@ -61,7 +61,7 @@ MarpaX::Languages::C::AST::Grammar - C grammar written in Marpa BNF
 
 =head1 VERSION
 
-version 0.27
+version 0.28
 
 =head1 SYNOPSIS
 
@@ -74,11 +74,14 @@ version 0.27
 
 =head1 DESCRIPTION
 
-This modules returns C grammar(s) written in Marpa BNF.
-Current grammars are:
+This modules returns C grammar(s) written in Marpa BNF. Current grammars are:
+
 =over
-=item *
-ISO-ANSI-C-2011. The ISO grammar of ANSI C 2011, as of L<http://www.quut.com/c/ANSI-C-grammar-y-2011.html> and L<http://www.quut.com/c/ANSI-C-grammar-l.html>.
+
+=item ISO-ANSI-C-2011
+
+The ISO grammar of ANSI C 2011, as of L<http://www.quut.com/c/ANSI-C-grammar-y-2011.html> and L<http://www.quut.com/c/ANSI-C-grammar-l.html>.
+
 =back
 
 =head1 SUBROUTINES/METHODS

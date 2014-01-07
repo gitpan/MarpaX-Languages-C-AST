@@ -52,7 +52,7 @@ our %KEY2ID = (
 our @PURGE_KEYS = sort {$KEY2ID{$a} <=> $KEY2ID{$b}} grep {$KEY2ID{$_} >= $KEY2ID{_MAX}} keys %KEY2ID;
 our $PURGE_IDX  = $KEY2ID{$PURGE_KEYS[0]};
 
-our $VERSION = '0.27'; # TRIAL VERSION
+our $VERSION = '0.28'; # TRIAL VERSION
 
 
 # ----------------------------------------------------------------------------------------
@@ -2789,7 +2789,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011::Scan - Scan C source
 
 =head1 VERSION
 
-version 0.27
+version 0.28
 
 =head1 SYNOPSIS
 
