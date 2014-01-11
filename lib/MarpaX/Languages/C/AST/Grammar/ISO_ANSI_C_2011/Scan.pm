@@ -54,7 +54,7 @@ our %KEY2ID = (
 our @PURGE_KEYS = sort {$KEY2ID{$a} <=> $KEY2ID{$b}} grep {$KEY2ID{$_} >= $KEY2ID{_MAX}} keys %KEY2ID;
 our $PURGE_IDX  = $KEY2ID{$PURGE_KEYS[0]};
 
-our $VERSION = '0.30'; # VERSION
+our $VERSION = '0.31'; # VERSION
 
 
 # ----------------------------------------------------------------------------------------
@@ -1135,7 +1135,9 @@ sub _purgeRcp {
 	delete($rcp->{$_});
       }
     } else {
-	splice(@{$rcp}, $PURGE_IDX);
+	if ($#{$rcp} >= $PURGE_IDX) {
+	    splice(@{$rcp}, $PURGE_IDX);
+	}
     }
 }
 
@@ -2890,7 +2892,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011::Scan - Scan C source
 
 =head1 VERSION
 
-version 0.30
+version 0.31
 
 =head1 SYNOPSIS
 
