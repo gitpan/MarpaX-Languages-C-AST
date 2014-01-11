@@ -44,6 +44,8 @@ my @modules = qw(
   Test::Differences
   Test::More
   Test::Trap
+  XML::LibXML
+  XML::Simple
   constant
   diagnostics
   parent

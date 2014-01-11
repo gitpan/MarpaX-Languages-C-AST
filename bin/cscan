@@ -8,51 +8,176 @@ use Pod::Usage;
 use POSIX qw/EXIT_FAILURE EXIT_SUCCESS/;
 use Config;
 use IO::String;
+use Data::Dumper;
+use XML::Simple;
+use XML::LibXML;
 
-# ABSTRACT: C source scan
+# ABSTRACT: C source scan (C::Scan alternative)
 
-our $VERSION = '0.29'; # VERSION
+our $VERSION = '0.30'; # VERSION
 
 # PODNAME: cscan
 
 my $help = 0;
 my $cpprun = undef;
-my $cppflags = undef;
+my @cppflags = ();
 my $filter = undef;
+my $xpath = undef;
+my $xml = 0;
+my $in = '';
+my $get = 0;
+my $out = '';
+my $err = '';
 
 GetOptions ('help!' => \$help,
             'cpprun=s' => \$cpprun,
-            'cppflags=s' => \$cppflags,
-            'filter=s' => \$filter);
+            'cppflags=s' => \@cppflags,
+            'filter=s' => \$filter,
+            'xml!' => \$xml,
+            'in=s' => \$in,
+            'xpath=s' => \$xpath,
+            'out=s' => \$out,
+            'err=s' => \$err,
+            'get=s' => \$get);
 
 #
-# We are injecting variables from %Config in POD
+# Do redirection asap, i.e. now, err first.
 #
+my $saveerr = _redirect(\*STDERR, $err);
+my $saveout = _redirect(\*STDOUT, $out);
+
+sub END {
+    _unredirect(\*STDOUT, $saveout);
+    _unredirect(\*STDERR, $saveerr);
+
+}
+
+my $guard = quotemeta('(if you read this message, do not worry: this is replaced by correct value at run-time)');
 my $pod = do {local $/; <DATA>};
-$pod =~ s/\$CPPRUN\b/$Config{cpprun}/g;
-$pod =~ s/\$CPPFLAGS\b/$Config{cppflags}/g;
+$pod =~ s/\$CPPRUN\b\s*$guard/$Config{cpprun}/g;
+$pod =~ s/\$CPPFLAGS\b\s*$guard/$Config{cppflags}/g;
 my $podfh = IO::String->new($pod);
 pod2usage(-input => $podfh, -exitval => EXIT_SUCCESS) if ($help);
-pod2usage(-input => $podfh, -exitval => EXIT_FAILURE) if (! @ARGV);
+pod2usage(-input => $podfh, -exitval => EXIT_FAILURE) if (! @ARGV && ! $in);
 pod2usage(-input => $podfh, -exitval => EXIT_FAILURE) if ($#ARGV > 0);
 
 #
 # If filter starts with '/' assume this is a regexp
 # -------------------------------------------------
-if (substr($filter, 0, 1) eq '/') {
-    $filter = qr/$filter/;
+if (defined($filter)) {
+    if (substr($filter, 0, 1) eq '/') {
+        $filter = eval "qr$filter"; ## no critic (ProhibitStringyEval)
+        die $@ if ($@);
+    }
 }
 
 my %config = ();
 $config{cpprun} = $cpprun if ($cpprun);
-$config{cppflags} = $cppflags if ($cppflags);
+$config{cppflags} = join(' ', @cppflags) if (@cppflags);
 $config{filename_filter} = $filter if ($filter);
 $config{asHash} = 1;
 
-# -------
-# Parse C
-# -------
-my $c = MarpaX::Languages::C::AST->new(filename => shift, %config);
+# --------------------------
+# Parse C, unless $in option
+# --------------------------
+my $c = $in ? undef : MarpaX::Languages::C::Scan->new(filename => shift, %config);
+
+# -----------------------
+# Give wanted information
+# -----------------------
+{
+    local $Data::Dumper::Indent    = 1;
+    local $Data::Dumper::Purity    = 0;
+    local $Data::Dumper::Terse     = 1;
+    local $Data::Dumper::Deepcopy  = 1;
+    local $Data::Dumper::Quotekeys = 0;
+    local $Data::Dumper::Sortkeys = 1;
+    if (defined($c)) {
+        foreach (split(/,/, $get)) {
+            next if (! $_ || ! "$_");
+            eval { print Dumper($c->$_) };
+            print STDERR "$@" if ($@);
+        }
+    }
+    if ($xpath || $xml) {
+        #
+        # Do an XML out of decls and defs
+        #
+        my $xmlout = undef;
+        if ($in) {
+            my $infh;
+            if (! open($infh, '<', $in)) {
+                die "Cannot read $in, $!";
+            }
+            $xmlout = do {local $/; <$infh>};
+            if (! close($infh)) {
+                warn "Cannot close $in, $!";
+            }
+        } else {
+            my $xmlHash = {
+                decls => $c->decls,
+                defs => $c->defs
+            };
+            $xmlout = XMLout($xmlHash, RootName => 'C');
+        }
+        if ($xml) {
+            print $xmlout;
+        }
+        if ($xpath) {
+            my $dom = XML::LibXML->load_xml(string => $xmlout);
+            my $compiled_xpath = XML::LibXML::XPathExpression->new($xpath);
+            my $nodeset = $dom->findnodes($xpath);
+            foreach ($nodeset->get_nodelist) {
+                my $node = $_;
+                print Dumper(XMLin($node->toString, ForceArray => [ 'args' ]));
+            }
+        }
+    }
+}
+
+sub _redirect {
+    my ($fh, $filename) = @_;
+
+    my $savefh = undef;
+
+    if (defined($filename) && "$filename") {
+        if (! open($savefh, '>&', $fh)) {
+            warn "Cannot save $fh handle, $!";
+        } else {
+            if (! open($fh, '>', $filename)) {
+                warn "Cannot redirect $fh to $filename, $!";
+                if (! open($fh, '>&', $savefh)) {
+                    warn "Cannot restore $fh, $!";
+                }
+                $savefh = undef;
+            } else {
+                #
+                # Unbuffer the redirected filehandle
+                #
+                my $oldfh = select($fh);
+                $| = 1;
+                select($oldfh);
+            }
+        }
+    }
+    return $savefh;
+}
+
+sub _unredirect {
+    my ($fh, $savefh) = @_;
+
+    if (defined($savefh)) {
+        if (! close($fh)) {
+            warn "Cannot close $fh";
+        }
+        #
+        # Unredirect anyway
+        #
+        if (! open($fh, '>&', $savefh)) {
+            warn "Cannot restore $fh, $!";
+        }
+    }
+}
 
 exit(EXIT_SUCCESS);
 
@@ -62,11 +187,11 @@ exit(EXIT_SUCCESS);
 
 =head1 NAME
 
-cscan - C source scan
+cscan - C source scan (C::Scan alternative)
 
 =head1 VERSION
 
-version 0.29
+version 0.30
 
 =head1 AUTHOR
 
@@ -93,11 +218,17 @@ cscan - C source scsan
 
  cscan [options] file
 
- Options:
+ Startup Options:
    --help                Brief help message.
-   --cpprun <argument>   cpp run command.
-   --cppflags <argument> cpp flags.
+   --cpprun <argument>   Preprocessor run command.
+   --cppflags <argument> Preprocessor flags.
    --filter <argument>   File to look at after proprocessing. Defaults to file argument.
+   --get <argument,...>  Dump the result of getting <argument>.
+   --xml                 Print out an XML view of all declarations and definitions.
+   --out <argument>      Redirect any output to this filename.
+   --err <argument>      Redirect any error to this filename.
+   --in <argument>       Load a full XML view of all declarations and definitions from this filename.
+   --xpath <argument>    Dump the result of an xpath query on declarations and definitions.
 
 =head1 OPTIONS
 
@@ -111,11 +242,328 @@ This help
 
 cpp run command. Default is the value when perl was compiled, i.e.:
 
-$CPPRUN
+$CPPRUN (if you read this message, do not worry: this is replaced by correct value at run-time)
+
+This option can be repeated.
 
 =item B<--cppflags <argument>>
 
 cpp flags. Default is the value when perl was compiled, i.e.:
 
-$CPPFLAGS
+$CPPFLAGS (if you read this message, do not worry: this is replaced by correct value at run-time)
 
+=item B<--filter <argument>>
+
+File to look at after proprocessing. Defaults to file argument.
+
+cscan is using the preprocessor. Every #include statement in your original source code is telling the preprocessor to look at another file, this is marked down by a line like:
+
+ #line ... "information on the file processed"
+
+in the generated output. The --filter argument is used to select which processed file is of interest, and obviously defaults to one given on the command-line. If $filter is starting with a slash "/" it is assumed to be a full regular expression (including modifier flags).
+
+=item B<--get <argument,...>>
+
+Dump the result of getting <argument> using perl module Data::Dumper. A comma "," is the separator for multiple arguments.
+
+<argument> is exactly one of the C::Scan like methods supported by MarpaX::languages::C::Scan, i.e.:
+
+=over
+
+=item ast
+
+The AST (Abstract Syntax Tree)
+
+=item decls
+
+All declarations.
+
+=item defines_args
+
+Macros with arguments.
+
+=item defines_no_args
+
+Macros without arguments.
+
+=item defs
+
+All definitions.
+
+=item fdecls
+
+Declarations of functions.
+
+=item includes
+
+Included files.
+
+=item inlines
+
+Definitions of functions.
+
+=item macros
+
+List of macros
+
+=item parsed_fdecls
+
+List of parsed functions declarations.
+
+=item strings
+
+List of strings.
+
+=item typedef_hash
+
+List of hash which contains known typedefs as keys.
+
+=item typedef_structs
+
+Hash which known typedefs as keys.
+
+=item typedef_texts
+
+List of known expansions of typedef.
+
+=item typedefs_maybe
+
+List of typedefed names.
+
+=item vdecl_hash
+
+Hash of parsed extern variable declarations.
+
+=item vdecls
+
+List of extern variable declarations.
+
+=back
+
+=item B<--xml>
+
+Print out an XML view of all declarations and definitions.
+
+The XML will have this structure:
+
+ <C>
+   <decls>...</decls>
+   <decls>...</decls>
+   ...
+   <defs>...</defs>
+   <defs>...</defs>
+ </C>
+
+There is one <decl/> element per declaration, one <defs/> element per function definition. Both can have the following attributes:
+
+=over
+
+=item rt
+
+Return type of a function.
+
+=item nm
+
+Identifier
+
+=item ft
+
+Full text used to get this information.
+
+=item mod
+
+Array modifiers if any (for example: char x[2] will make mod to be: '[2]').
+
+=item ty
+
+Type of a declarator. In case of a function, the type will contain only eventual stars '*'.
+
+=item extern
+
+"1" value means this is an 'extern' declaration.
+
+=item typedef
+
+"1" value means this is an 'typedef' declaration.
+
+=item init
+
+Declarator initialization, if any. For example, with char *x = "value" init will be the string "value".
+
+=item func
+
+"1" means this is an function declaration.
+
+=item struct
+
+"1" means this is a struct declaration.
+
+=item union
+
+"1" means this is a union declaration.
+
+=item structOrUnion
+
+"1" means this is a struct or union declaration. If true, it is guaranteed that one of 'struct' or 'union' attributes is true.
+
+=item type
+
+"1" means this is a type declaration. If true, it is guaranteed that one of 'typedef' or 'structOrUnion' attribute is true, and that the 'var' attribute (see below) is false.
+
+=item var
+
+"1" means this is a variable declaration. If true, it is guaranteed that the 'type' attribute is false.
+
+=item file
+
+Filename where this parsed statement occurs. The filename is derived from the preprocessor output, with no modification.
+
+=item line
+
+Line number within filename where is beginning the attribute 'ft'.
+
+=back
+
+The only possible child element is:
+
+=over
+
+=item args
+
+Array reference of arguments parsed declarations, which can have same attributes as listed below, and other args children.
+
+=back
+
+=item B<--in <argument>>
+
+Load a full XML view of all declarations and definitions from this filename.
+
+Doing so will prevent I<any> preprocessor call and analysis: cscan will assume this XML has a correct format. Such option exist because analysing preprocessing output takes time, and often, once the analysis is done, it is easier to reload the result to do xpath queries. For instance, first you create the XML:
+
+ cscan --out /tmp/file.xml --xml /tmp/file.c
+
+then you do xpath queries on the reloaded output:
+
+ cscan --in /tmp/file.xml --xpath "//*[contains(@nm,'x')]"
+ cscan --in /tmp/file.xml --xpath "//*[contains(@nm,'Y')]"
+
+When you use the --in option, the --get option becomes a noop.
+
+=item B<--xpath <argument>>
+
+Dump the result of an XPath (version 1) query on the XML structure described above. Found nodes are converted to hashes for readibility and printed out. For example, to find all nodes having an identifier named "x":
+
+ cscan --xpath "//*[contains(@nm,'x')]" /tmp/file.c
+
+To find all declared strings:
+
+ cscan --xpath "//*[starts-with(@init,'\"')]" /tmp/file.c
+
+To find all function definitions that have at least one argument of type "mytype":
+
+ cscan --xpath "//*[@func=\"1\"]/args[@var=\"1\" and @ty=\"double\"]/.." /tmp/file.c
+
+=item B<--out <argument>>
+
+Redirect any output to this filename.
+
+=item B<--err <argument>>
+
+Redirect any error to this filename.
+
+=back
+
+=head1 EXAMPLES
+
+ cscan --get strings                                                                         /tmp/file.c
+ cscan --get strings,macros --cppflags "-I/tmp/dir1            -DMYDEFINE"                   /tmp/file.c
+ cscan --get strings,macros --cppflags  -I/tmp/dir1 --cppflags -DMYDEFINE                    /tmp/file.c
+ cscan --get strings        --cppflags  -I/tmp/dir1 --cppflags -DMYDEFINE --filter '/\.H$/i' /tmp/file.c
+
+The parsing result for the following source code, in filename test.c:
+
+ int func1(int x1, double *x2, float *( f1)(int x11, double x12));
+ int func1(int x1, double *x2, float *( f1)(int x11, double x12)) {
+   char *string = "&";
+   return 0;
+ }
+
+will be converted to xml using:
+
+ cscan --xml test.c
+
+giving:
+
+ <C>
+   <decls file="test.c" ft="int func1(int x1, double *x2, float *( f1)(int x11, double x12))" func="1" line="1" nm="func1" rt="int" var="1">
+     <args file="test.c" ft="int x1" line="1" nm="x1" ty="int" var="1" />
+     <args file="test.c" ft="double *x2" line="1" nm="x2" ty="double *" var="1" />
+     <args file="test.c" ft="float *( f1)(int x11, double x12)" func="1" line="1" nm="f1" rt="float *" var="1">
+       <args file="test.c" ft="int x11" line="1" nm="x11" ty="int" var="1" />
+       <args file="test.c" ft="double x12" line="1" nm="x12" ty="double" var="1" />
+     </args>
+   </decls>
+   <defs file="test.c" ft="int func1(int x1, double *x2, float *( f1)(int x11, double x12)) {
+  char *string = &quot;&amp;&quot;;
+  return 0;
+}" func="1" line="2" nm="func1" rt="int">
+     <args file="test.c" ft="int x1" line="2" nm="x1" ty="int" var="1" />
+     <args file="test.c" ft="double *x2" line="2" nm="x2" ty="double *" var="1" />
+     <args file="test.c" ft="float *( f1)(int x11, double x12)" func="1" line="2" nm="f1" rt="float *" var="1">
+       <args file="test.c" ft="int x11" line="2" nm="x11" ty="int" var="1" />
+       <args file="test.c" ft="double x12" line="2" nm="x12" ty="double" var="1" />
+     </args>
+   </defs>
+ </C>
+
+while the following source code:
+
+ struct s1_ {
+   int x;
+   enum {E1, E2} e;
+   struct {
+     long y;
+     double z;
+     char *s[1024][32];
+   } innerStructure;
+ };
+
+will give the following XML:
+
+ <C>
+   <decls enum="1" nm="ANON0" ty="ANON0" type="1">
+     <args file="test.c" ft="E1" line="3" nm="E1" ty="int" var="1" />
+   </decls>
+   <decls nm="s1_" struct="1" structOrUnion="1" ty="struct s1_" type="1">
+     <args file="test.c" ft="int x" line="2" nm="x" ty="int" var="1" />
+     <args file="test.c" ft="enum {E1, E2} e" line="3" nm="e" ty="ANON0" var="1" />
+     <args nm="ANON1" struct="1" structOrUnion="1" ty="struct ANON1" type="1">
+       <args file="test.c" ft="long y" line="5" nm="y" ty="long" var="1" />
+       <args file="test.c" ft="double z" line="6" nm="z" ty="double" var="1" />
+       <args file="test.c" ft="char *s[1024][32]" line="7" mod="[1024]" nm="s" ty="char *" var="1" />
+     </args>
+     <args file="test.c" ft="struct {
+     long y;
+     double z;
+     char *s[1024][32];
+   } innerStructure" line="4" nm="innerStructure" ty="struct ANON1" var="1" />
+   </decls>
+   <decls file="test.c" ft="struct s1_ {
+   int x;
+   enum {E1, E2} e;
+   struct {
+     long y;
+     double z;
+     char *s[1024][32];
+   } innerStructure;
+ };" line="1" nm="ANON2" ty="struct s1_" var="1" />
+ </C>
+
+In the later example you see that I<anonymous> types can be in an arg element. They do not have the attribute "var". Anonymous types are of two categeries: structOrUnion (divided again in struct or union), and enum. Per definition, enum types are I<always> global, wherever and whenever they appear, i.e. they will always be a direct child of <decls/>. On contrary, structOrUnion types always stay in the scope of their declaration.
+
+
+=head1 SEE ALSO
+
+L<MarpaX::Languages::C::Scan>
+
+L<Data::Dumper>

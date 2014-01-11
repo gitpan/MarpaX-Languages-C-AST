@@ -17,7 +17,7 @@ my %WriteMakefileArgs = (
   },
   "DISTNAME" => "MarpaX-Languages-C-AST",
   "EXE_FILES" => [
-    "bin/c2ast.pl",
+    "bin/c2ast",
     "bin/cscan"
   ],
   "LICENSE" => "perl",
@@ -46,6 +46,8 @@ my %WriteMakefileArgs = (
     "SUPER" => 0,
     "Scalar::Util" => 0,
     "Term::ProgressBar" => 0,
+    "XML::LibXML" => 0,
+    "XML::Simple" => 0,
     "constant" => 0,
     "diagnostics" => 0,
     "parent" => 0,
@@ -64,7 +66,7 @@ my %WriteMakefileArgs = (
     "Test::More" => 0,
     "Test::Trap" => 0
   },
-  "VERSION" => "0.29",
+  "VERSION" => "0.30",
   "test" => {
     "TESTS" => "t/*.t"
   }
@@ -102,6 +104,8 @@ my %FallbackPrereqs = (
   "Test::Differences" => 0,
   "Test::More" => 0,
   "Test::Trap" => 0,
+  "XML::LibXML" => 0,
+  "XML::Simple" => 0,
   "constant" => 0,
   "diagnostics" => 0,
   "parent" => 0,

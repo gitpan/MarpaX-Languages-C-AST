@@ -26,7 +26,7 @@ my @module_files = (
 );
 
 my @scripts = (
-    'bin/c2ast.pl',
+    'bin/c2ast',
     'bin/cscan'
 );
 

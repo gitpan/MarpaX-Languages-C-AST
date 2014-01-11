@@ -2,7 +2,7 @@ NAME
     MarpaX::Languages::C::AST - Translate a C source to an AST
 
 VERSION
-    version 0.29
+    version 0.30
 
 SYNOPSIS
         use strict;
@@ -105,6 +105,10 @@ SUBROUTINES/METHODS
     is false, the module will croak if there more than one parse tree value.
     If this flag is true, a reference to an array of values will be
     returned, even if there is a single parse tree value.
+
+INCOMPATIBILITIES
+    Since version 0.30, the c2ast.pl script is named c2ast (i.e. without
+    extension).
 
 SEE ALSO
     Log::Any, Marpa::R2

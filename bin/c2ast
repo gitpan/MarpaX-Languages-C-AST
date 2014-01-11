@@ -22,9 +22,9 @@ autoflush STDOUT 1;
 
 # ABSTRACT: C source analysis
 
-our $VERSION = '0.29'; # VERSION
+our $VERSION = '0.30'; # VERSION
 
-# PODNAME: c2ast.pl
+# PODNAME: c2ast
 
 my $help = 0;
 my @cpp = ();
@@ -82,11 +82,12 @@ my @cmd = (@cpp, @ARGV);
 $log->debugf('Executing preprocessor: %s', \@cmd);
 run(\@cmd, \undef, \$preprocessedOutput);
 if ($cppdup) {
-  if (! open(CPP, '>', $cppdup)) {
+    my $fh;
+  if (! open($fh, '>', $cppdup)) {
     warn "Cannot open $cppdup, $!\n";
   } else {
-    print CPP $preprocessedOutput;
-    if (! close(CPP)) {
+    print $fh $preprocessedOutput;
+    if (! close($fh)) {
       warn "Cannot close $cppdup, $!\n";
     }
   }
@@ -155,11 +156,12 @@ if ($dump || $dumpfile || %check) {
       print Dumper($value);
     }
     if ($dumpfile) {
-      if (! open(DUMP, '>', $dumpfile)) {
+	my $fh;
+      if (! open($fh, '>', $dumpfile)) {
         warn "Cannot open $dumpfile, $!\n";
       } else {
-        print DUMP $dump;
-        if (! close(DUMP)) {
+        print $fh $dump;
+        if (! close($fh)) {
           warn "Cannot close $dumpfile, $!\n";
         }
       }
@@ -311,11 +313,11 @@ sub lexemeCallback {
 
 =head1 NAME
 
-c2ast.pl - C source analysis
+c2ast - C source analysis
 
 =head1 VERSION
 
-version 0.29
+version 0.30
 
 =head1 SYNOPSIS
 

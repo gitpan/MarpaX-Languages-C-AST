@@ -45,14 +45,16 @@ our %KEY2ID = (
     enum           => 15,
     type           => 16,
     var            => 17,
-    _MAX           => 18,           # Internal usage only
+    file           => 18,
+    line           => 19,
+    _MAX           => 20,           # Internal usage only
     _startPosition => 90,           # Internal usage only
 );
 
 our @PURGE_KEYS = sort {$KEY2ID{$a} <=> $KEY2ID{$b}} grep {$KEY2ID{$_} >= $KEY2ID{_MAX}} keys %KEY2ID;
 our $PURGE_IDX  = $KEY2ID{$PURGE_KEYS[0]};
 
-our $VERSION = '0.29'; # VERSION
+our $VERSION = '0.30'; # VERSION
 
 
 # ----------------------------------------------------------------------------------------
@@ -80,31 +82,26 @@ sub new {
   #
   $self->{_anonCount} = 0;
 
-  my $local_filename = '';
-  my $local_fh = undef;
   if (exists($opts{content})) {
     if (! defined($opts{content})) {
       croak 'Undefined content';
     }
     $self->{_content2fh} = File::Temp->new(UNLINK => 1, SUFFIX => '.c');
-    $self->{_filename} = File::Spec->canonpath($self->{_content2fh}->filename);
+    my $filename = $self->{_orig_filename} = $self->{_content2fh}->filename;
     #
     # We open twice the temporary file to make sure it is not deleted
     # physically on disk and still visible for our process
     #
-    $self->{_tmpfh} = IO::File->new($self->{_filename}, 'r') || croak "Cannot open $self->{_filename}, $!";
+    $self->{_tmpfh} = IO::File->new($filename, 'r') || croak "Cannot open $filename, $!";
     print($self->{_content2fh}, $opts{content});
     close($self->{_content2fh}) || warn "Cannot close $self->{_content2fh}, $!";
     $self->{_content} = $opts{content};
   } else {
-    if (! defined($opts{filename})) {
-      if ($local_filename) {
-        unlink($local_filename);
-      }
+    if (! exists($opts{filename}) || ! defined($opts{filename})) {
       croak 'Undefined filename';
     }
-    $self->{_tmpfh} = IO::File->new($opts{filename}, 'r') || croak "Cannot open $opts{filename}, $!";
-    $self->{_filename} = File::Spec->canonpath($opts{filename});
+    my $filename = $self->{_orig_filename} = $opts{filename};
+    $self->{_tmpfh} = IO::File->new($filename, 'r') || croak "Cannot open $filename, $!";
   }
 
   if (defined($self->{_filename_filter})) {
@@ -118,11 +115,7 @@ sub new {
 	      #
 	      $self->{_filename_filter_re} = $self->{_filename_filter};
 	  }
-      } else {
-	  $self->{_filename_filter} = File::Spec->canonpath($self->{_filename_filter});
       }
-  } else {
-      $self->{_filename_filter} = $self->{_filename};
   }
 
   bless($self, $class);
@@ -156,6 +149,11 @@ sub ast {
 
 sub get {
   my ($self, $attribute) = @_;
+
+  if ($attribute eq 'get' ||
+      $attribute eq 'new') {
+    croak "$attribute attribute is not supported";
+  }
 
   return $self->$attribute;
 }
@@ -458,7 +456,7 @@ sub typedef_structs {
 sub _init {
     my ($self) = @_;
 
-    my $cmd = "$self->{_cpprun} $self->{_cppflags} $self->{_filename}";
+    my $cmd = "$self->{_cpprun} $self->{_cppflags} $self->{_orig_filename}";
 
     my ($success, $error_code, undef, $stdout_bufp, $stderr_bufp) = run(command => $cmd);
 
@@ -468,9 +466,37 @@ sub _init {
 
     my $stdout_buf = join('',@{$stdout_bufp});
 
+    $self->_initInternals();
     $self->_analyse_with_grammar($stdout_buf);
     $self->_analyse_with_heuristics($stdout_buf);
     $self->_posprocess_heuristics();
+    $self->_cleanInternals();
+
+}
+
+# ----------------------------------------------------------------------------------------
+
+sub _initInternals {
+    my ($self) = @_;
+
+    $self->{_preprocessorNbNewlinesInFront} = {};
+    $self->{_position2File} = {};
+    $self->{_position2Line} = {};
+    $self->{_position2LineReal} = {};
+    $self->{_sortedPosition2File} = [];
+
+}
+
+# ----------------------------------------------------------------------------------------
+
+sub _cleanInternals {
+    my ($self) = @_;
+
+    delete($self->{_preprocessorNbNewlinesInFront});
+    delete($self->{_position2File});
+    delete($self->{_position2Line});
+    delete($self->{_position2LineReal});
+    delete($self->{_sortedPosition2File});
 
 }
 
@@ -488,7 +514,6 @@ sub _getAst {
   #
   $self->{_includes} = {};
   $self->{_strings} = [];
-  $self->{_position2File} = {};
   #
   # Plus from our module: strings detection
   #
@@ -880,10 +905,16 @@ sub _pushRcp {
 	$self->_setRcp($rcp, 'nm', $nm);
     }
     #
-    # - Full text
+    # - Full text and file/line information
     #
-    my $ft = $self->_text($stdout_buf, $o, $self->_getRcp($contextp, '_startPosition'));
+    my ($file, $line) = ('', -1);
+    my $ft = $self->_text($stdout_buf, $o, $self->_getRcp($contextp, '_startPosition'), undef, \$file, \$line);
     $self->_setRcp($rcp, 'ft', $ft);
+    if (! exists($ENV{MARPAX_LANGUAGES_C_AST_SCAN_TEST})) {
+	$self->_setRcp($rcp, 'file', $file);
+	$self->_setRcp($rcp, 'line', $line);
+    }
+
     #
     # - Final type: rt for a function, ty otherwise, EXCEPT at the
     #   top level of functionDefinition, where there is no type
@@ -908,7 +939,13 @@ sub _pushRcp {
     #
     foreach (keys %KEY2ID) {
 	if (! $self->_definedRcp($rcp, $_) && $self->_definedRcp($contextp, $_)) {
+          #
+          # Everything is always inherited except for type of a function, setted by
+          # function itself and never overwritable
+          #
+          if ($_ ne 'ty' || ! $self->_definedRcp($rcp, 'func')) {
 	    $self->_setRcp($rcp, $_, $self->_getRcp($contextp, $_));
+          }
 	}
     }
     #
@@ -1217,7 +1254,7 @@ sub _startPosition {
 # ----------------------------------------------------------------------------------------
 
 sub _text {
-    my ($self, $stdout_buf, $o, $startPosition, $endPosition) = @_;
+    my ($self, $stdout_buf, $o, $startPosition, $endPosition, $filep, $linep) = @_;
 
     if (! defined($startPosition) || ! defined($endPosition)) {
 
@@ -1248,6 +1285,20 @@ sub _text {
     #$text =~ s/^\s*//;
     #$text =~ s/\s$//;
     #$text =~ s/\s+/ /g;
+
+    if (defined($filep) || defined($linep)) {
+	my $file = '';
+	my $line = -1;
+
+	if ($self->_positionOk($startPosition, $stdout_buf, \$file, \$line)) {
+	    if (defined($filep)) {
+		${$filep} = $file;
+	    }
+	    if (defined($linep)) {
+		${$linep} = $line;
+	    }
+	}
+    }
 
     return $text;
 }
@@ -2651,14 +2702,37 @@ sub _lexemeCallback {
   # We wait until the first #line information: this will give the name of current file
   #
   if ($lexemeHashp->{name} eq 'PREPROCESSOR_LINE_DIRECTIVE') {
-    if ($lexemeHashp->{value} =~ /[\d]+\s*\"([^\"]+)\"/) {
-	my $currentFile = File::Spec->canonpath(substr($lexemeHashp->{value}, $-[1], $+[1] - $-[1]));
-	#
-	# It can very well be that current file from cpp point of view is an internal thing.
-	# Not a real file. For example: '<command-line>', says GCC.
-	#
+    if ($lexemeHashp->{value} =~ /([\d]+)\s*\"([^\"]+)\"/) {
+	my $currentLine = substr($lexemeHashp->{value}, $-[1], $+[1] - $-[1]);
+	my $currentFile = substr($lexemeHashp->{value}, $-[2], $+[2] - $-[2]);
+        if (! defined($self->{_filename})) {
+          #
+          # The very first filename is always the original source.
+          #
+          $self->{_filename} = $currentFile;
+        }
+        if (! defined($self->{_filename_filter})) {
+          #
+          # Some precompilers like gcc from mingw like to double the backslashes.
+          # We are independant of preprocessing style by doing it like that.
+          #
+          $self->{_filename_filter} = $self->{_filename};
+        }
+
 	$tmpHashp->{_currentFile} = $currentFile;
+	$tmpHashp->{_currentLine} = $currentLine;
+	$tmpHashp->{_currentLineReal} = $lexemeHashp->{line};
+
 	$self->{_position2File}->{$lexemeHashp->{start}} = $tmpHashp->{_currentFile};
+	$self->{_position2Line}->{$lexemeHashp->{start}} = $tmpHashp->{_currentLine};
+	$self->{_position2LineReal}->{$lexemeHashp->{start}} = $tmpHashp->{_currentLineReal};
+        if ($lexemeHashp->{value} =~ /^\s+/) {
+          my $front = substr($lexemeHashp->{value}, $-[0], $+[0] - $-[0]);
+          $self->{_preprocessorNbNewlinesInFront}->{$lexemeHashp->{start}} = ($front =~ tr/\n//);
+        } else {
+          $self->{_preprocessorNbNewlinesInFront}->{$lexemeHashp->{start}} = 0;
+        }
+
 	$tmpHashp->{_includes}->{$tmpHashp->{_currentFile}}++;
     }
     #
@@ -2694,7 +2768,9 @@ sub _lexemeCallback {
 # ----------------------------------------------------------------------------------------
 
 sub _positionOk {
-    my ($self, $position) = @_;
+    my ($self, $position, $stdout_buf, $filep, $linep, $origPosition) = @_;
+
+    $origPosition //= $position;
 
     #
     # A position is OK if:
@@ -2702,11 +2778,36 @@ sub _positionOk {
     # previous known position passes filename_filter
     #
     if (exists($self->{_position2File}->{$position})) {
+	my $rc;
 	if (exists($self->{_filename_filter_re})) {
-	    return $self->{_position2File}->{$position} =~ $self->{_filename_filter_re};
+	    $rc = ($self->{_position2File}->{$position} =~ $self->{_filename_filter_re}) ? 1 : 0;
 	} else {
-	    return $self->{_position2File}->{$position} eq $self->{_filename_filter};
+	    $rc = ($self->{_position2File}->{$position} eq $self->{_filename_filter}) ? 1 : 0;
 	}
+	if ($rc && (defined($filep) || defined($linep))) {
+	    #
+	    # Get file/line information
+	    #
+	    my $file = $self->{_position2File}->{$position};
+	    #
+	    # $self->{_position2LineReal}->{$position} is the line number in $stdout_buf
+            # $self->{_position2Line}->{$position}     is the line number as per the preprocessor
+            #
+	    # We need to know the number of lines between $position and $origPosition
+            # The line number within original (i.e. before the preprocessing) will be this delta plus
+            # $self->{_position2Line}->{$position}.
+            #
+	    my $deltaBuf = substr($stdout_buf, $position, $origPosition - $position);
+	    my $nbLines = ($deltaBuf =~ tr/\n//);
+	    my $line = $self->{_position2Line}->{$position} + ($nbLines - 1 - $self->{_preprocessorNbNewlinesInFront}->{$position});
+	    if (defined($filep)) {
+		${$filep} = $file;
+	    }
+	    if (defined($linep)) {
+		${$linep} = $line;
+	    }
+	}
+	return $rc;
     }
     my $previousPosition = undef;
     foreach (@{$self->{_sortedPosition2File}}) {
@@ -2721,7 +2822,7 @@ sub _positionOk {
     if (! defined($previousPosition)) {
 	return 0;
     }
-    return $self->_positionOk($previousPosition);
+    return $self->_positionOk($previousPosition, $stdout_buf, $filep, $linep, $origPosition);
 }
 
 # ----------------------------------------------------------------------------------------
@@ -2763,7 +2864,7 @@ sub _posprocess_heuristics {
 	    my $value = substr($_, $-[3], $+[3] - $-[3]);
 	    substr($args,  0, 1, '');  # '('
 	    substr($args, -1, 1, '');  # ')'
-	    my @args = map {s/\s//g; $_;} split(/,/, $args);
+	    my @args = map {my $element = $_; $element =~ s/\s//g; $element;} split(/,/, $args);
 	    $self->{_defines_args}->{$name} = [ [ @args ], $value ];
 	} else {
 	    /(\w+)\s*(.*)/s;
@@ -2789,7 +2890,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011::Scan - Scan C source
 
 =head1 VERSION
 
-version 0.29
+version 0.30
 
 =head1 SYNOPSIS
 
@@ -2930,6 +3031,14 @@ A flag: true value means this is a type declaration. If true, it is guaranteed t
 
 A flag: true value means this is a variable declaration. If true, it is guaranteed that the 'type' flag is false.
 
+=item file
+
+A string: filename where this parsed statement occurs. The filename is derived from the preprocessor output, with no modification.
+
+=item line
+
+A string: line number within filename where is beginning the full text 'ft'.
+
 =back
 
 =head1 METHODS
@@ -2956,11 +3065,11 @@ Returns a reference to a list of macros before preprocessing.
 
 =head2 defines_args($self)
 
-Returns a reference to a hash of macros with arguments. This is a post-processing of $self->macros.
+Returns a reference to hash of macros with arguments. The values are references to an array of length 2, the first element is a reference to the list of arguments, the second one being the expansion.
 
 =head2 defines_no_args($self)
 
-Returns a reference to a hash of macros with no argument. This is also a post-processing of $self->macros.
+Returns a reference to hash of macros without arguments.
 
 =head2 decls($self)
 

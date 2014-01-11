@@ -13,7 +13,7 @@ use MarpaX::Languages::C::AST::Impl qw//;
 use MarpaX::Languages::C::AST::Scope qw//;
 use MarpaX::Languages::C::AST::Callback::Events qw//;
 
-our $VERSION = '0.29'; # VERSION
+our $VERSION = '0.30'; # VERSION
 
 
 # ----------------------------------------------------------------------------------------
@@ -442,7 +442,7 @@ MarpaX::Languages::C::AST - Translate a C source to an AST
 
 =head1 VERSION
 
-version 0.29
+version 0.30
 
 =head1 SYNOPSIS
 
@@ -545,6 +545,10 @@ Returns the MarpaX::Languages::C::AST::Scope object.
 =head2 value($self, $optionalArrayOfValuesb)
 
 Return the blessed value. Takes as optional parameter a flag saying if the return value should be an array of all values or not. If this flag is false, the module will croak if there more than one parse tree value. If this flag is true, a reference to an array of values will be returned, even if there is a single parse tree value.
+
+=head1 INCOMPATIBILITIES
+
+Since version 0.30, the c2ast.pl script is named c2ast (i.e. without extension).
 
 =head1 SEE ALSO
 
