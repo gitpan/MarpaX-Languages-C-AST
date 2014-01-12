@@ -54,7 +54,7 @@ our %KEY2ID = (
 our @PURGE_KEYS = sort {$KEY2ID{$a} <=> $KEY2ID{$b}} grep {$KEY2ID{$_} >= $KEY2ID{_MAX}} keys %KEY2ID;
 our $PURGE_IDX  = $KEY2ID{$PURGE_KEYS[0]};
 
-our $VERSION = '0.31'; # VERSION
+our $VERSION = '0.32'; # VERSION
 
 
 # ----------------------------------------------------------------------------------------
@@ -1036,19 +1036,21 @@ sub _setRcp {
 # ----------------------------------------------------------------------------------------
 
 sub _appendRcp {
-    my ($self, $rcp, $key, $value) = @_;
+    my ($self, $rcp, $key, $value, $separator) = @_;
+
+    $separator //= ' ';
 
     if (defined($value)) {
 
       if ($self->{_asHash}) {
 	if (defined($rcp->{$key}) && length($rcp->{$key}) > 0) {
-          $rcp->{$key} .= " $value";
+          $rcp->{$key} .= "$separator$value";
 	} else {
           $self->_setRcp($rcp, $key, $value);
 	}
       } else {
 	if (defined($rcp->[$KEY2ID{$key}]) && length($rcp->[$KEY2ID{$key}]) > 0) {
-          $rcp->[$KEY2ID{$key}] .= " $value";
+          $rcp->[$KEY2ID{$key}] .= "$separator$value";
 	} else {
           $self->_setRcp($rcp, $key, $value);
 	}
@@ -2271,14 +2273,9 @@ sub _analyseDirectDeclarator {
 	if (! $self->_analyseDirectDeclarator($stdout_buf, $directDeclarator->[0], $rcp)) {
 	    return 0;
 	}
-	if (! $self->_definedRcp($rcp, 'mod')) {
-	    #
-	    # This should not be already defined in theory since we do not allow more than one recursion
-	    #
-	    my $startPosition = $directDeclarator->[1]->[0];
-	    my $endPosition = $self->_endPosition($directDeclarator);
-	    $self->_setRcp($rcp, 'mod', substr($stdout_buf, $startPosition, $endPosition - $startPosition + 1));
-	}
+	my $startPosition = $directDeclarator->[1]->[0];
+	my $endPosition = $self->_endPosition($directDeclarator);
+	$self->_appendRcp($rcp, 'mod', substr($stdout_buf, $startPosition, $endPosition - $startPosition + 1), '');
     }
 
     return 1;
@@ -2361,14 +2358,9 @@ sub _analyseDirectAbstractDeclarator {
 	#                            | LBRACKET gccArrayTypeModifierList RBRACKET                                                       ( 8)
 	#                            | LBRACKET assignmentExpression RBRACKET                                                           ( 9)
 	#
-	if (! $self->_definedRcp($rcp, 'mod')) {
-	    #
-	    # This should not be already defined in theory since we do not allow more than one recursion
-	    #
-	    my $startPosition = $directAbstractDeclarator->[0]->[0];
-	    my $endPosition = $self->_endPosition($directAbstractDeclarator);
-	    $self->_setRcp($rcp, 'mod', substr($stdout_buf, $startPosition, $endPosition - $startPosition + 1));
-	}
+	my $startPosition = $directAbstractDeclarator->[0]->[0];
+	my $endPosition = $self->_endPosition($directAbstractDeclarator);
+	$self->_appendRcp($rcp, 'mod', substr($stdout_buf, $startPosition, $endPosition - $startPosition + 1), '');
     }
     elsif ($firstElementBlessed eq 'C::AST::directAbstractDeclarator' &&
 	   ! $secondElementBlessed && $secondElementReftype eq 'ARRAY' && $secondElement->[2] eq '[') {
@@ -2385,14 +2377,9 @@ sub _analyseDirectAbstractDeclarator {
 	if (! $self->_analyseDirectAbstractDeclarator($stdout_buf, $firstElement, $rcp)) {
 	    return 0;
 	}
-	if (! $self->_definedRcp($rcp, 'mod')) {
-	    #
-	    # This should not be already defined in theory since we do not allow more than one recursion
-	    #
-	    my $startPosition = $directAbstractDeclarator->[1]->[0];
-	    my $endPosition = $self->_endPosition($directAbstractDeclarator);
-	    $self->_setRcp($rcp, 'mod', substr($stdout_buf, $startPosition, $endPosition - $startPosition + 1));
-	}
+	my $startPosition = $directAbstractDeclarator->[1]->[0];
+	my $endPosition = $self->_endPosition($directAbstractDeclarator);
+	$self->_appendRcp($rcp, 'mod', substr($stdout_buf, $startPosition, $endPosition - $startPosition + 1), '');
     } else {
 	#                            | LPAREN_SCOPE RPAREN_SCOPE                                                                        (18)
 	#                            | LPAREN_SCOPE parameterTypeList RPAREN_SCOPE                                                      (19)
@@ -2892,7 +2879,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011::Scan - Scan C source
 
 =head1 VERSION
 
-version 0.31
+version 0.32
 
 =head1 SYNOPSIS
 
@@ -2991,7 +2978,7 @@ A string: full text used to get the information of current hash. Please note tha
 
 =item mod
 
-A string: array modifiers if any (for example: char x[2] will make mod to be: '[2]').
+A string: array modifiers if any (for example: char x[2] will make mod to be: '[2]', char y[2][3] will make mod to be: '[2][3]'). It is guaranteed that there is no space between multiple '[...]'.
 
 =item ty
 
