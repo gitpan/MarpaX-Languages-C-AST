@@ -6,11 +6,11 @@ package MarpaX::Languages::C::AST::Impl;
 # ABSTRACT: Implementation of Marpa's interface
 
 # use MarpaX::Languages::C::AST::Util qw/traceAndUnpack/;
-use Marpa::R2 2.064000;
+use Marpa::R2 2.078000;
 use Carp qw/croak/;
 use MarpaX::Languages::C::AST::Impl::Logger;
 
-our $VERSION = '0.32'; # VERSION
+our $VERSION = '0.33'; # TRIAL VERSION
 
 our $MARPA_TRACE_FILE_HANDLE;
 our $MARPA_TRACE_BUFFER;
@@ -157,7 +157,7 @@ MarpaX::Languages::C::AST::Impl - Implementation of Marpa's interface
 
 =head1 VERSION
 
-version 0.32
+version 0.33
 
 =head1 SYNOPSIS
 

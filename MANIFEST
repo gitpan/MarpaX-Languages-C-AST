@@ -14,6 +14,7 @@ examples/atomic_type_qualifier.pl
 examples/atomic_type_specifier.pl
 examples/c2astgcc.pl
 examples/file.pl
+examples/h2xs.PL
 examples/if-if-else.pl
 examples/synopsis.pl
 inc/MarpaX/Languages/C/AST/Expected.pm
@@ -35,6 +36,7 @@ lib/MarpaX/Languages/C/AST/Util/Data/Find.pm
 lib/MarpaX/Languages/C/Scan.pm
 t/00-compile.t
 t/00-report-prereqs.t
+t/asm-opaque.t
 t/discard_GCC_attribute.t
 t/discard_MSVS_declspec.t
 t/discard_MSVS_pragma.t

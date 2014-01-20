@@ -12,7 +12,7 @@ use Carp qw/croak/;
 # Marpa follows Unicode recommendation, i.e. perl's \R, that cannot be in a character class
 our $NEWLINE_REGEXP = qr/(?>\x0D\x0A|\v)/;
 
-our $VERSION = '0.32'; # VERSION
+our $VERSION = '0.33'; # TRIAL VERSION
 # CONTRIBUTORS
 
 our @EXPORT_OK = qw/whoami whowasi traceAndUnpack logCroak showLineAndCol lineAndCol lastCompleted startAndLength/;
@@ -69,7 +69,7 @@ sub logCroak {
     my ($fmt, @arg) = @_;
 
     my $msg = sprintf($fmt, @arg);
-    $log->fatalf($msg);
+    $log->fatalf('%s', $msg);
     if (! $log->is_fatal()) {
       #
       # Logging is not enabled at FATAL level: re do the message in croak
@@ -110,6 +110,10 @@ sub showLineAndCol {
       }
     }
     pos(${$sourcep}) = $prevpos;
+    #
+    # We rely on any space being a true space for the pointer accuracy
+    #
+    $content =~ s/\s/ /g;
 
     return "line:column $line:$col (Unicode newline count) $nbnewlines:$col (\\n count)\n\n$content\n$pointer";
 }
@@ -154,7 +158,7 @@ MarpaX::Languages::C::AST::Util - C Translation to AST - Class method utilities
 
 =head1 VERSION
 
-version 0.32
+version 0.33
 
 =head1 SYNOPSIS
 

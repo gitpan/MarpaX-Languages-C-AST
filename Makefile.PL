@@ -39,12 +39,13 @@ my %WriteMakefileArgs = (
     "Log::Any" => 0,
     "Log::Any::Adapter" => 0,
     "Log::Log4perl" => 0,
-    "Marpa::R2" => "2.064000",
+    "Marpa::R2" => "2.078000",
     "POSIX" => 0,
     "Pod::Usage" => 0,
     "Regexp::Common" => 0,
     "SUPER" => 0,
     "Scalar::Util" => 0,
+    "String::ShellQuote" => 0,
     "Term::ProgressBar" => 0,
     "XML::LibXML" => 0,
     "XML::Simple" => 0,
@@ -66,7 +67,7 @@ my %WriteMakefileArgs = (
     "Test::More" => 0,
     "Test::Trap" => 0
   },
-  "VERSION" => "0.32",
+  "VERSION" => "0.33",
   "test" => {
     "TESTS" => "t/*.t"
   }
@@ -94,12 +95,13 @@ my %FallbackPrereqs = (
   "Log::Any" => 0,
   "Log::Any::Adapter" => 0,
   "Log::Log4perl" => 0,
-  "Marpa::R2" => "2.064000",
+  "Marpa::R2" => "2.078000",
   "POSIX" => 0,
   "Pod::Usage" => 0,
   "Regexp::Common" => 0,
   "SUPER" => 0,
   "Scalar::Util" => 0,
+  "String::ShellQuote" => 0,
   "Term::ProgressBar" => 0,
   "Test::Differences" => 0,
   "Test::More" => 0,
@@ -122,6 +124,10 @@ unless ( eval { ExtUtils::MakeMaker->VERSION(6.63_03) } ) {
 
 delete $WriteMakefileArgs{CONFIGURE_REQUIRES}
   unless eval { ExtUtils::MakeMaker->VERSION(6.52) };
+
+if ( $^O eq 'MSWin32' ) {
+	$WriteMakefileArgs{PREREQ_PM}{'Win32::ShellQuote'} = '> 0';
+}
 
 WriteMakefile(%WriteMakefileArgs);
 

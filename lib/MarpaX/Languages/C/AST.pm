@@ -12,8 +12,12 @@ use MarpaX::Languages::C::AST::Grammar qw//;
 use MarpaX::Languages::C::AST::Impl qw//;
 use MarpaX::Languages::C::AST::Scope qw//;
 use MarpaX::Languages::C::AST::Callback::Events qw//;
+use Regexp::Common qw/comment delimited/;
 
-our $VERSION = '0.32'; # VERSION
+our $WS_RE = qr/[ \t\v\n\f]/;          # C.f. doAsmOpaque()
+our $ASM_COMMENT_RE = qr/(?:;[^\n]*|$RE{comment}{'C++'})/;
+
+our $VERSION = '0.33'; # TRIAL VERSION
 
 
 # ----------------------------------------------------------------------------------------
@@ -91,14 +95,23 @@ sub parse {
   $self->_doPreprocessing($pos);
   eval {$pos = $self->{_impl}->read($sourcep, $pos)};
   if ($@) {
-      my $line_columnp = lineAndCol($self->{_impl});
-      logCroak("%s\nLast position:\n\n%s%s", "$@", showLineAndCol(@{$line_columnp}, $self->{_sourcep}), $self->_context());
+    my $origError = $@;
+    #
+    # The very first error could be at line 0 / column 0...
+    #
+    my $line_columnp = eval { lineAndCol($self->{_impl}) };
+    if (! $@) {
+      logCroak("%s\nLast position:\n\n%s%s", $origError, showLineAndCol(@{$line_columnp}, $self->{_sourcep}), $self->_context());
+    } else {
+      logCroak("%s", $origError);
+    }
   }
   do {
     my %lexeme = ();
     $self->_getLexeme(\%lexeme);
     $self->_doScope(\%lexeme);
     $self->_doEvents();
+    $self->_doAsmOpaque(\%lexeme, $pos, $max);
     $pos += $self->_doPauseBeforeLexeme(\%lexeme);
     $self->_doLogInfo(\%lexeme);
     $self->_doLexemeCallback(\%lexeme);
@@ -140,23 +153,24 @@ sub value {
   $arrayOfValuesb ||= 0;
 
   my @rc = ();
-  my $nvalue = 0;
+
   my $valuep = $self->{_impl}->value() || logCroak('%s', $self->_show_last_expression());
   if (defined($valuep)) {
     push(@rc, $valuep);
+  } else {
+    logCroak('No parse tree  value.');
   }
   do {
-    ++$nvalue;
     $valuep = $self->{_impl}->value();
     if (defined($valuep)) {
+	if (! $arrayOfValuesb) {
+	    logCroak('There is more than just one parse tree value.');
+	}
       push(@rc, $valuep);
     }
   } while (defined($valuep));
-  if ($#rc != 0 && ! $arrayOfValuesb) {
-    logCroak('Number of parse tree value is %d. Should be 1.', scalar(@rc));
-  }
   if ($arrayOfValuesb) {
-    return [ @rc ];
+    return \@rc;
   } else {
     return $rc[0];
   }
@@ -375,6 +389,153 @@ sub _doScope {
   }
 }
 # ----------------------------------------------------------------------------------------
+sub _doAsmOpaque {
+  my ($self, $lexemeHashp, $pos, $max) = @_;
+
+  #
+  # Get paused lexeme
+  #
+  if (exists($lexemeHashp->{name})) {
+
+    my $lexemeFormatString = "%s \"%s\" at position %d:%d";
+    my @lexemeCommonInfo = ($lexemeHashp->{name}, $lexemeHashp->{value}, $lexemeHashp->{line}, $lexemeHashp->{column});
+    my $is_debug = $log->is_debug;
+
+    if ($lexemeHashp->{name} eq 'ANY_ASM') {
+      if ($is_debug) {
+        $log->debugf("[%s] $lexemeFormatString: checking for the need of ASM_OPAQUE at current position $pos", whoami(__PACKAGE__), @lexemeCommonInfo);
+      }
+      my $prevpos = pos(${$self->{_sourcep}});
+      pos(${$self->{_sourcep}}) = $pos;
+      if (${$self->{_sourcep}} =~ /\G${WS_RE}*\(/ ||
+          ${$self->{_sourcep}} =~ /\G${WS_RE}+\w+${WS_RE}*\(/) {
+        #
+        # assume to be eventually GCC style ASM : supported in the BNF
+        #
+        my $style = substr(${$self->{_sourcep}}, $pos, $+[0] - $pos);
+        if ($is_debug) {
+          $log->debugf("[%s] $lexemeFormatString: GCC style detected %s%s...)", whoami(__PACKAGE__), @lexemeCommonInfo, $lexemeHashp->{value}, $style);
+        }
+      } elsif (${$self->{_sourcep}} =~ /\G${WS_RE}*\{/) {
+        #
+        # Opaque ASM block
+        #
+        my $tmpPos = $+[0];
+        if ($is_debug) {
+          $log->debugf("[%s] $lexemeFormatString: '{' detected.", whoami(__PACKAGE__), @lexemeCommonInfo);
+        }
+        #
+        # We scan character per character until a matching '}'
+        #
+        my $found = substr(${$self->{_sourcep}}, $-[0], $+[0] - $-[0]);
+        my $remain = 1;
+        my $opaque = '';
+        while ($tmpPos < $max) {
+          pos(${$self->{_sourcep}}) = $tmpPos;
+          if (${$self->{_sourcep}} =~ /\G$ASM_COMMENT_RE/) {
+            #
+            # Full comment in one regexp
+            #
+            my $posAfterComment = $+[0];
+            my $comment = substr(${$self->{_sourcep}}, $tmpPos, $posAfterComment - $tmpPos);
+            if ($is_debug) {
+              $log->debugf("[%s] $lexemeFormatString: skipping comment %s", whoami(__PACKAGE__), @lexemeCommonInfo, $comment);
+            }
+            $found .= $comment;
+            $tmpPos = $posAfterComment;
+          } elsif (${$self->{_sourcep}} =~ /\GCOMMENT\s+([^\s])\s+/) {
+            #
+            # MSASM comment directive
+            #
+            my $delimiter = substr(${$self->{_sourcep}}, $-[1], $+[1] - $-[1]);
+            pos(${$self->{_sourcep}}) = $-[1];
+            if (${$self->{_sourcep}} =~ /\G(?:$RE{delimited}{-delim=>$delimiter})[^\n]*/) {
+              my $posAfterComment = $+[0];
+              my $comment = substr(${$self->{_sourcep}}, $tmpPos, $posAfterComment - $tmpPos);
+              if ($is_debug) {
+                $log->debugf("[%s] $lexemeFormatString: skipping comment %s", whoami(__PACKAGE__), @lexemeCommonInfo, $comment);
+              }
+              $found .= $comment;
+              $tmpPos = $posAfterComment;
+            } else {
+	      my $line_columnp = lineAndCol($self->{_impl});
+	      logCroak("[%s] Failed to find MSASM's COMMENT end delimiter %s.\n\nLast position:\n\n%s%s", whoami(__PACKAGE__), $delimiter, showLineAndCol($lexemeHashp->{line}, $lexemeHashp->{column}, $self->{_sourcep}), $self->_context());
+            }
+          } elsif (${$self->{_sourcep}} =~ /\G['"]/) {
+            #
+            # MSASM string, no escape character
+            #
+            my $delimiter = substr(${$self->{_sourcep}}, $-[0], 1);
+            pos(${$self->{_sourcep}}) = $-[0];
+            if (${$self->{_sourcep}} =~ /\G(?:$RE{delimited}{-delim=>$delimiter})/) {
+              my $posAfterString = $+[0];
+              my $string = substr(${$self->{_sourcep}}, $tmpPos, $posAfterString - $tmpPos);
+              if ($is_debug) {
+                $log->debugf("[%s] $lexemeFormatString: skipping string %s", whoami(__PACKAGE__), @lexemeCommonInfo, $string);
+              }
+              $found .= $string;
+              $tmpPos = $posAfterString;
+            } else {
+	      my $line_columnp = lineAndCol($self->{_impl});
+	      logCroak("[%s] Failed to find MSASM's string delimiter %s.\n\nLast position:\n\n%s%s", whoami(__PACKAGE__), $delimiter, showLineAndCol($lexemeHashp->{line}, $lexemeHashp->{column}, $self->{_sourcep}), $self->_context());
+            }
+          } else {
+            my $c = substr(${$self->{_sourcep}}, $tmpPos, 1);
+            if ($c eq '{') {
+              ++$remain;
+            } elsif ($c eq '}') {
+              --$remain;
+            }
+            $found .= $c;
+            ++$tmpPos;
+            if ($remain == 0) {
+              last;
+            }
+          }
+        }
+        if ($remain != 0) {
+          $log->warnf("[%s] $lexemeFormatString: could not determine opaque asm statement", whoami(__PACKAGE__), @lexemeCommonInfo);
+        } else {
+          my $newlexeme = 'ASM_OPAQUE';
+	  if ($log->is_debug) {
+	      $log->debugf('[%s] Pushing lexeme %s "%s"', whoami(__PACKAGE__), $newlexeme, $found);
+	  }
+	  if (! defined($self->{_impl}->lexeme_read($newlexeme, $pos, length($found), $found))) {
+	      my $line_columnp = lineAndCol($self->{_impl});
+	      logCroak("[%s] Lexeme value \"%s\" cannot be associated to lexeme name %s at position %d:%d.\n\nLast position:\n\n%s%s", whoami(__PACKAGE__), $found, $newlexeme, $lexemeHashp->{line}, $lexemeHashp->{column}, showLineAndCol(@{$line_columnp}, $self->{_sourcep}), $self->_context());
+	  }
+	  #
+	  # A lexeme_read() can generate an event
+	  #
+          $self->_getLexeme($lexemeHashp);
+	  $self->_doEvents();
+        }
+      } elsif (${$self->{_sourcep}} =~ /\G[^\n]*/) {
+        #
+        # Could be an opaque ASM on a single line. If we are wrong, BNF will take over this wrong assumption
+        # by invalidating the tree. Please note that this will handle eventual multiple __asm statements, all
+        # on the same line -;
+        #
+        my $found = substr(${$self->{_sourcep}}, $-[0], $+[0] - $-[0]);
+        my $newlexeme = 'ASM_OPAQUE';
+        if ($log->is_debug) {
+          $log->debugf('[%s] Pushing lexeme %s "%s"', whoami(__PACKAGE__), $newlexeme, $found);
+        }
+        if (! defined($self->{_impl}->lexeme_read($newlexeme, $pos, length($found), $found))) {
+          my $line_columnp = lineAndCol($self->{_impl});
+          logCroak("[%s] Lexeme value \"%s\" cannot be associated to lexeme name %s at position %d:%d.\n\nLast position:\n\n%s%s", whoami(__PACKAGE__), $found, $newlexeme, $lexemeHashp->{line}, $lexemeHashp->{column}, showLineAndCol(@{$line_columnp}, $self->{_sourcep}), $self->_context());
+        }
+        #
+        # A lexeme_read() can generate an event
+        #
+        $self->_getLexeme($lexemeHashp);
+        $self->_doEvents();
+      }
+      pos(${$self->{_sourcep}}) = $prevpos;
+    }
+  }
+}
+# ----------------------------------------------------------------------------------------
 sub _doPauseBeforeLexeme {
   my ($self, $lexemeHashp) = @_;
 
@@ -442,7 +603,7 @@ MarpaX::Languages::C::AST - Translate a C source to an AST
 
 =head1 VERSION
 
-version 0.32
+version 0.33
 
 =head1 SYNOPSIS
 

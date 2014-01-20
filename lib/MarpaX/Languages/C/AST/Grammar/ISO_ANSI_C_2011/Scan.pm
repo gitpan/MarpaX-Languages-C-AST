@@ -14,12 +14,14 @@ use File::Temp qw/tempfile/;
 use IO::File;
 use Scalar::Util qw/blessed reftype/;
 use Regexp::Common;
+use String::ShellQuote qw/shell_quote_best_effort/;  # Not for Win32, but passes everywhere, so ok to use it like that
 use constant {
     LEXEME_POSITION_INDEX => 0,
     LEXEME_LENGTH_INDEX => 1,
     LEXEME_VALUE_INDEX => 2
 };
-    
+our $HAVE_SYS__INFO = eval 'use Sys::Info; 1' || 0;
+our $HAVE_Win32__ShellQuote = _is_windows() ? (eval 'use Win32::ShellQuote qw/quote_native/; 1' || 0) : 0;
 our $RESAMELINE = qr/(?:[ \t\v\f])*/;                        # i.e. WS* without \n
 our $REDEFINE = qr/^${RESAMELINE}#${RESAMELINE}define${RESAMELINE}(\w+(?>[^\n\\]*)(?>\\.[^\n\\]*)*)/ms; # dot-matches-all mode, keeping ^ meaningful
 our $BALANCEDPARENS = qr/$RE{balanced}{-parens=>'()'}{-keep}/;
@@ -54,7 +56,7 @@ our %KEY2ID = (
 our @PURGE_KEYS = sort {$KEY2ID{$a} <=> $KEY2ID{$b}} grep {$KEY2ID{$_} >= $KEY2ID{_MAX}} keys %KEY2ID;
 our $PURGE_IDX  = $KEY2ID{$PURGE_KEYS[0]};
 
-our $VERSION = '0.32'; # VERSION
+our $VERSION = '0.33'; # TRIAL VERSION
 
 
 # ----------------------------------------------------------------------------------------
@@ -70,8 +72,8 @@ sub new {
   }
 
   my $self = {
-              _cpprun          => exists($opts{cpprun})            ? $opts{cpprun}              : $Config{cpprun},
-              _cppflags        => exists($opts{cppflags})          ? $opts{cppflags}            : $Config{cppflags},
+              _cpprun          => exists($opts{cpprun})            ? $opts{cpprun}              : ($ENV{MARPAX_LANGUAGES_C_SCAN_CPPRUN} || $Config{cpprun}),
+              _cppflags        => exists($opts{cppflags})          ? $opts{cppflags}            : ($ENV{MARPAX_LANGUAGES_C_SCAN_CPPFLAGS} || $Config{cppflags}),
               _filename_filter => exists($opts{filename_filter}  ) ? $opts{filename_filter}     : undef,
               _asHash          => exists($opts{asHash}           ) ? $opts{asHash}              : 0,
               _enumType        => exists($opts{enumType}         ) ? $opts{enumType}            : 'int',
@@ -230,7 +232,7 @@ sub parsed_fdecls {
   my @list = ();
 
   foreach (@{$self->decls}) {
-      if (! $self->_getRcp($_, 'func')) {
+      if ($self->_getRcp($_, 'typedef') || ! $self->_getRcp($_, 'func')) {
 	  next;
       }
       my $argsp = [];
@@ -452,11 +454,70 @@ sub typedef_structs {
 }
 
 # ----------------------------------------------------------------------------------------
+# Brutal copy of String::ShellQuote::quote_literal
+
+sub _quote_literal {
+    my ($text, $force) = @_;
+
+    # basic argument quoting.  uses backslashes and quotes to escape
+    # everything.
+    if (!$force && $text ne '' && $text !~ /[ \t\n\x0b"]/) {
+        # no quoting needed
+    }
+    else {
+        $text =~ s{(\\*)(?="|\z)}{$1$1}g;
+        $text =~ s{"}{\\"}g;
+        $text = qq{"$text"};
+    }
+
+    return $text;
+}
+
+# ----------------------------------------------------------------------------------------
+
+sub _is_windows {
+  my $rc;
+
+  if ($HAVE_SYS__INFO) {
+    my $info = Sys::Info->new;
+    my $os   = $info->os();
+    $rc = $os->is_windows;
+  } else {
+    if ($^O =~ /win32/i) {
+      $rc = 1;
+    } else {
+      $rc = 0;
+    }
+  }
+
+  return $rc;
+}
+
+# ----------------------------------------------------------------------------------------
 
 sub _init {
     my ($self) = @_;
 
-    my $cmd = "$self->{_cpprun} $self->{_cppflags} $self->{_orig_filename}";
+    #
+    # Note that, because we do not know if cpprun or cppflags contain multiple things
+    # we cannot use the array version of run(). So ye have to stringify ourself.
+    # It is assumed (and is the case with %Config value), that cpprun and cppflags
+    # will be already properly escaped.
+    # Remains the filename that we do ourself.
+    # Tyo big categories: Win32, others
+    #
+    my $quotedFilename;
+    my $cmd = "$self->{_cpprun} $self->{_cppflags} ";
+    if (_is_windows()) {
+      if ($HAVE_Win32__ShellQuote) {
+        $quotedFilename = quote_native($self->{_orig_filename});
+      } else {
+        $quotedFilename = _quote_literal($self->{_orig_filename}, 1);
+      }
+    } else {
+      $quotedFilename = shell_quote_best_effort($self->{_orig_filename});
+    }
+    $cmd .= $quotedFilename;
 
     my ($success, $error_code, undef, $stdout_bufp, $stderr_bufp) = run(command => $cmd);
 
@@ -1038,22 +1099,18 @@ sub _setRcp {
 sub _appendRcp {
     my ($self, $rcp, $key, $value, $separator) = @_;
 
-    $separator //= ' ';
-
     if (defined($value)) {
 
-      if ($self->{_asHash}) {
-	if (defined($rcp->{$key}) && length($rcp->{$key}) > 0) {
-          $rcp->{$key} .= "$separator$value";
-	} else {
-          $self->_setRcp($rcp, $key, $value);
-	}
+      if ($self->_definedRcp($rcp, $key) && length($self->_getRcp($rcp, $key)) > 0) {
+        $separator //= ' ';
+        my $append = $separator . $value;
+        if ($self->{_asHash}) {
+          $rcp->{$key} .= $append;
+        } else {
+          $rcp->[$KEY2ID{$key}] .= $append;
+        }
       } else {
-	if (defined($rcp->[$KEY2ID{$key}]) && length($rcp->[$KEY2ID{$key}]) > 0) {
-          $rcp->[$KEY2ID{$key}] .= "$separator$value";
-	} else {
           $self->_setRcp($rcp, $key, $value);
-	}
       }
     }
 }
@@ -1061,22 +1118,20 @@ sub _appendRcp {
 # ----------------------------------------------------------------------------------------
 
 sub _prependRcp {
-    my ($self, $rcp, $key, $value) = @_;
+    my ($self, $rcp, $key, $value, $separator) = @_;
 
     if (defined($value)) {
 
-      if ($self->{_asHash}) {
-	if (defined($rcp->{$key}) && length($rcp->{$key}) > 0) {
-          $rcp->{$key} = "$value $rcp->{$key}";
-	} else {
-          $self->_setRcp($rcp, $key, $value);
-	}
+      if ($self->_definedRcp($rcp, $key) && length($self->_getRcp($rcp, $key)) > 0) {
+        $separator //= ' ';
+        my $prepend = $value . $separator;
+        if ($self->{_asHash}) {
+          $rcp->{$key} = $prepend . $rcp->{$key};
+        } else {
+          $rcp->[$KEY2ID{$key}] = $prepend . $rcp->[$KEY2ID{$key}];
+        }
       } else {
-	if (defined($rcp->[$KEY2ID{$key}]) && length($rcp->[$KEY2ID{$key}]) > 0) {
-          $rcp->[$KEY2ID{$key}] = "$value $rcp->[$KEY2ID{$key}]";
-	} else {
           $self->_setRcp($rcp, $key, $value);
-	}
       }
     }
 }
@@ -1086,10 +1141,7 @@ sub _prependRcp {
 sub _definedRcp {
     my ($self, $rcp, $key) = @_;
 
-    if ($self->{_asHash} && ! exists($rcp->{$key})) {
-	#
-	# This is preventing undef to be inserted in the hash, in hash mode if any
-	#
+    if (! $self->_existsRcp($rcp, $key)) {
 	return 0;
     }
 
@@ -1111,7 +1163,7 @@ sub _existsRcp {
 	#
 	# No notion of exists for an array. Using defined will put the  value to undef
 	#
-	return $self->_definedRcp($rcp, $key);
+	return $#{$rcp} >= $KEY2ID{$key};
     }
 }
 
@@ -1119,6 +1171,10 @@ sub _existsRcp {
 
 sub _deleteRcp {
     my ($self, $rcp, $key) = @_;
+
+    if (! $self->_existsRcp($rcp, $key)) {
+	return;
+    }
 
     if ($self->{_asHash}) {
 	delete($rcp->{$key});
@@ -1147,6 +1203,10 @@ sub _purgeRcp {
 
 sub _getRcp {
     my ($self, $rcp, $key) = @_;
+
+    if (! $self->_existsRcp($rcp, $key)) {
+	return undef;
+    }
 
     if ($self->{_asHash}) {
 	return $rcp->{$key};
@@ -2879,7 +2939,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011::Scan - Scan C source
 
 =head1 VERSION
 
-version 0.32
+version 0.33
 
 =head1 SYNOPSIS
 
@@ -2928,11 +2988,11 @@ Use hash references for parsed information instead of the default that is: array
 
 =item cpprun
 
-Preprocessor command, default is $Config{cpprun}.
+Preprocessor command, default is $ENV{MARPAX_LANGUAGES_C_SCAN_CPPRUN}, or $Config{cpprun}. It is assume that cpprun is already correctly quoted for your system shell.
 
 =item cppflags
 
-Preprocessor flags, default is $Config{cppflags}.
+Preprocessor flags, default is $ENV{MARPAX_LANGUAGES_C_SCAN_CPPFLAGS}, $Config{cppflags}. It is assume that cppflags is already correctly quoted for your system shell.
 
 =item enumType
 

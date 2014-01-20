@@ -8,14 +8,13 @@ use IO::String;
 
 # ABSTRACT: ISO ANSI C 2011 grammar written in Marpa BNF
 
-our $VERSION = '0.32'; # VERSION
+our $VERSION = '0.33'; # TRIAL VERSION
 
 
 our %DEFAULT_PAUSE = (
     TYPEDEF_NAME         => 'before',
     ENUMERATION_CONSTANT => 'before',
     IDENTIFIER           => 'before',
-    # MSVS_ASM             => 'before',
     SEMICOLON            => 'after',
     LCURLY_SCOPE         => 'after',
     RCURLY_SCOPE         => 'after',
@@ -23,6 +22,7 @@ our %DEFAULT_PAUSE = (
     EQUAL                => 'after',
     LPAREN_SCOPE         => 'after',
     RPAREN_SCOPE         => 'after',
+    ANY_ASM              => 'after',
 );
 
 our $DATA = do {local $/; <DATA>};
@@ -110,7 +110,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011 - ISO ANSI C 2011 grammar wr
 
 =head1 VERSION
 
-version 0.32
+version 0.33
 
 =head1 SYNOPSIS
 
@@ -696,7 +696,7 @@ statement
 	| selectionStatement
 	| iterationStatement
 	| jumpStatement
-        | msvsAsmStatement
+        | opaqueAsmStatement
         | gccAsmStatement
 
 labeledStatement
@@ -1122,13 +1122,48 @@ ANYTHING_ELSE   ~ [.]
 :discard ~ ANYTHING_ELSE # discard bad characters
 
 #
+# ASM Stuff. We explicitely support the full GCC Inline Assembly.
+# For any other case, you have to cross your fingers:
+# Either:
+# - the asm keyword is followed by '{'. In this case we eat
+#   all characters up to a matching '}'. Careful handling is
+#   done for strings, and comments, where comments are:
+#   * MSASM styles:
+#     ; anythingUpToEndOfLine
+#     COMMENT delimiter ... delimiter anythingUpToEndOfLine
+#   * C/C++ styles
+#   and where strings do not support escape character, as in MSASM, i.e.:
+#   * "..." without \" in it
+#   " '...' without \' in it
+#   In this case the ASM_OPAQUE lexeme is hooked
+#   to the full asm statement, i.e. { ... }
+# - the asm keyword is not followed by '{'. Then:
+#   * it is followed by a '(': this is either a normal C statement
+#     or assumed to be a GCC-style inline assembly. We let the BNF
+#     take care of it
+#   * it is followed by a typeQualifier and again by a '(': same
+#     situation
+#   * else it is assumed to be a single ASM statement on the whole line.
+#     In this case the ASM_OPAQUE statement is also hooked and explicitely "lexeme_read"ed
+#     with a length corresponding to the full remaining characters,i.e.:
+#     [anything up to but not including newline]
+#
+
+#
+# ASM HOOK
+#
+:lexeme ~ <GCC_ASM>              priority => -60
+:lexeme ~ <ANY_ASM>              priority => -60
+_ASM             ~ 'asm__'
+_ASM             ~ '__asm'
+_ASM             ~ '__asm__'
+_ASM             ~ 'asm'
+GCC_ASM          ~ _ASM
+ANY_ASM          ~ _ASM
+ASM_OPAQUE       ~ [^\s\S]
+#
 # GCC C LEXEMES
 #
-:lexeme ~ <GCC_ASM>                  priority => -60
-GCC_ASM              ~ 'asm__'
-GCC_ASM              ~ '__asm'
-GCC_ASM              ~ '__asm__'
-GCC_ASM              ~ 'asm'
 :lexeme ~ <GCC_EXTENSION>            priority => -60
 GCC_EXTENSION        ~ 'extension__'
 GCC_EXTENSION        ~ '__extension'
@@ -1155,8 +1190,6 @@ GCC_ALIGNOF ~ 'alignof'
 #
 # MSVS C LEXEMES
 #
-:lexeme ~ <MSVS_ASM>                 priority => -60
-MSVS_ASM ~ '__asm'
 :lexeme ~ <MSVS_FASTCALL>            priority => -60
 MSVS_FASTCALL ~ '__fastcall'
 :lexeme ~ <MSVS_THISCALL>            priority => -60
@@ -1179,8 +1212,6 @@ MSVS_INT16 ~ '__int16'
 MSVS_INT32 ~ '__int32'
 :lexeme ~ <MSVS_INT64>               priority => -60
 MSVS_INT64 ~ '__int64'
-:lexeme ~ <MSVS_AT>                  priority => -60
-MSVS_AT ~ '@'
 :lexeme ~ <MSVS_W64>                 priority => -60
 MSVS_W64 ~ '__w64'
 :lexeme ~ <MSVS_PTR32>               priority => -60
@@ -1188,310 +1219,6 @@ MSVS_PTR32 ~ '__ptr32'
 :lexeme ~ <MSVS_PTR64>               priority => -60
 MSVS_PTR64 ~ '__ptr64'
 
-#
-# MSVS ASM LEXEMES
-# ----------------
-:lexeme ~ <MSVS_ASM_REP>                 priority => -60
-MSVS_ASM_REP ~ 'REP'
-MSVS_ASM_REP ~ 'rep'
-:lexeme ~ <MSVS_ASM_REPE>                priority => -60
-MSVS_ASM_REPE ~ 'REPE'
-MSVS_ASM_REPE ~ 'repe'
-:lexeme ~ <MSVS_ASM_REPZ>                priority => -60
-MSVS_ASM_REPZ ~ 'REPZ'
-MSVS_ASM_REPZ ~ 'repz'
-:lexeme ~ <MSVS_ASM_REPNE>               priority => -60
-MSVS_ASM_REPNE ~ 'REPNE'
-MSVS_ASM_REPNE ~ 'repne'
-:lexeme ~ <MSVS_ASM_REPNZ>               priority => -60
-MSVS_ASM_REPNZ ~ 'REPNZ'
-MSVS_ASM_REPNZ ~ 'repnz'
-:lexeme ~ <MSVS_ASM_AND>                 priority => -60
-MSVS_ASM_AND ~ 'AND'
-MSVS_ASM_AND ~ 'and'
-:lexeme ~ <MSVS_ASM_MOD>                 priority => -60
-MSVS_ASM_MOD ~ 'MOD'
-MSVS_ASM_MOD ~ 'mod'
-:lexeme ~ <MSVS_ASM_NOT>                 priority => -60
-MSVS_ASM_NOT ~ 'NOT'
-MSVS_ASM_NOT ~ 'not'
-:lexeme ~ <MSVS_ASM_OR>                  priority => -60
-MSVS_ASM_OR ~ 'OR'
-MSVS_ASM_OR ~ 'or'
-:lexeme ~ <MSVS_ASM_SEG>                 priority => -60
-MSVS_ASM_SEG ~ 'SEG'
-MSVS_ASM_SEG ~ 'seg'
-:lexeme ~ <MSVS_ASM_SHL>                 priority => -60
-MSVS_ASM_SHL ~ 'SHL'
-MSVS_ASM_SHL ~ 'shl'
-:lexeme ~ <MSVS_ASM_SHLD>                priority => -60
-MSVS_ASM_SHLD ~ 'SHLD'
-MSVS_ASM_SHLD ~ 'shld'
-:lexeme ~ <MSVS_ASM_MOV>                 priority => -60
-MSVS_ASM_MOV ~ 'MOV'
-MSVS_ASM_MOV ~ 'mov'
-:lexeme ~ <MSVS_ASM_SHR>                 priority => -60
-MSVS_ASM_SHR ~ 'SHR'
-MSVS_ASM_SHR ~ 'shr'
-:lexeme ~ <MSVS_ASM_XOR>                 priority => -60
-MSVS_ASM_XOR ~ 'XOR'
-MSVS_ASM_XOR ~ 'xor'
-#:lexeme ~ <MSVS_ASM_SHORT>               priority => -60
-#MSVS_ASM_SHORT ~ 'SHORT'
-:lexeme ~ <MSVS_ASM_TYPE>                priority => -60
-MSVS_ASM_TYPE ~ 'TYPE'
-MSVS_ASM_TYPE ~ 'type'
-#:lexeme ~ <MSVS_ASM_OPATTR>              priority => -60
-#MSVS_ASM_OPATTR ~ 'OPATTR'
-:lexeme ~ <MSVS_ASM_STAR>                priority => -60
-MSVS_ASM_STAR ~ '*'
-:lexeme ~ <MSVS_ASM_SLASH>               priority => -60
-MSVS_ASM_SLASH ~ '/'
-:lexeme ~ <MSVS_ASM_AH>                  priority => -60
-MSVS_ASM_AH ~ 'AH'
-MSVS_ASM_AH ~ 'ah'
-:lexeme ~ <MSVS_ASM_AL>                  priority => -60
-MSVS_ASM_AL ~ 'AL'
-MSVS_ASM_AL ~ 'al'
-:lexeme ~ <MSVS_ASM_AX>                  priority => -60
-MSVS_ASM_AX ~ 'AX'
-MSVS_ASM_AX ~ 'ax'
-:lexeme ~ <MSVS_ASM_BH>                  priority => -60
-MSVS_ASM_BH ~ 'BH'
-MSVS_ASM_BH ~ 'bh'
-:lexeme ~ <MSVS_ASM_BL>                  priority => -60
-MSVS_ASM_BL ~ 'BL'
-MSVS_ASM_BL ~ 'bl'
-:lexeme ~ <MSVS_ASM_BP>                  priority => -60
-MSVS_ASM_BP ~ 'BP'
-MSVS_ASM_BP ~ 'bp'
-:lexeme ~ <MSVS_ASM_BX>                  priority => -60
-MSVS_ASM_BX ~ 'BX'
-MSVS_ASM_BX ~ 'bx'
-:lexeme ~ <MSVS_ASM_BYTE>                priority => -60
-MSVS_ASM_BYTE ~ 'BYTE'
-MSVS_ASM_BYTE ~ 'byte'
-:lexeme ~ <MSVS_ASM_CH>                  priority => -60
-MSVS_ASM_CH ~ 'CH'
-MSVS_ASM_CH ~ 'ch'
-:lexeme ~ <MSVS_ASM_CL>                  priority => -60
-MSVS_ASM_CL ~ 'CL'
-MSVS_ASM_CL ~ 'cl'
-:lexeme ~ <MSVS_ASM_COLON>               priority => -60
-MSVS_ASM_COLON ~ ':'
-:lexeme ~ <MSVS_ASM_CR0>                 priority => -60
-MSVS_ASM_CR0 ~ 'CR0'
-MSVS_ASM_CR0 ~ 'cr0'
-:lexeme ~ <MSVS_ASM_CR2>                 priority => -60
-MSVS_ASM_CR2 ~ 'CR2'
-MSVS_ASM_CR2 ~ 'cr2'
-:lexeme ~ <MSVS_ASM_CR3>                 priority => -60
-MSVS_ASM_CR3 ~ 'CR3'
-MSVS_ASM_CR3 ~ 'cr3'
-:lexeme ~ <MSVS_ASM_CS>                  priority => -60
-MSVS_ASM_CS ~ 'CS'
-MSVS_ASM_CS ~ 'cs'
-:lexeme ~ <MSVS_ASM_CX>                  priority => -60
-MSVS_ASM_CX ~ 'CX'
-MSVS_ASM_CX ~ 'cx'
-:lexeme ~ <MSVS_ASM_DH>                  priority => -60
-MSVS_ASM_DH ~ 'DH'
-MSVS_ASM_DH ~ 'dh'
-:lexeme ~ <MSVS_ASM_DI>                  priority => -60
-MSVS_ASM_DI ~ 'DI'
-MSVS_ASM_DI ~ 'di'
-:lexeme ~ <MSVS_ASM_DL>                  priority => -60
-MSVS_ASM_DL ~ 'DL'
-MSVS_ASM_DL ~ 'dl'
-:lexeme ~ <MSVS_ASM_DOLLAR>              priority => -60
-MSVS_ASM_DOLLAR ~ '$'
-:lexeme ~ <MSVS_ASM_DOT>                 priority => -60
-MSVS_ASM_DOT ~ '.'
-:lexeme ~ <MSVS_ASM_DR0>                 priority => -60
-MSVS_ASM_DR0 ~ 'DR0'
-MSVS_ASM_DR0 ~ 'dr0'
-:lexeme ~ <MSVS_ASM_DR1>                 priority => -60
-MSVS_ASM_DR1 ~ 'DR1'
-MSVS_ASM_DR1 ~ 'dr1'
-:lexeme ~ <MSVS_ASM_DR2>                 priority => -60
-MSVS_ASM_DR2 ~ 'DR2'
-MSVS_ASM_DR2 ~ 'dr2'
-:lexeme ~ <MSVS_ASM_DR3>                 priority => -60
-MSVS_ASM_DR3 ~ 'DR3'
-MSVS_ASM_DR3 ~ 'dr3'
-:lexeme ~ <MSVS_ASM_DR6>                 priority => -60
-MSVS_ASM_DR6 ~ 'DR6'
-MSVS_ASM_DR6 ~ 'dr6'
-:lexeme ~ <MSVS_ASM_DR7>                 priority => -60
-MSVS_ASM_DR7 ~ 'DR7'
-MSVS_ASM_DR7 ~ 'dr7'
-:lexeme ~ <MSVS_ASM_DS>                  priority => -60
-MSVS_ASM_DS ~ 'DS'
-MSVS_ASM_DS ~ 'ds'
-:lexeme ~ <MSVS_ASM_DWORD>               priority => -60
-MSVS_ASM_DWORD ~ 'DWORD'
-MSVS_ASM_DWORD ~ 'dword'
-:lexeme ~ <MSVS_ASM_DX>                  priority => -60
-MSVS_ASM_DX ~ 'DX'
-MSVS_ASM_DX ~ 'dx'
-:lexeme ~ <MSVS_ASM_EAX>                 priority => -60
-MSVS_ASM_EAX ~ 'EAX'
-MSVS_ASM_EAX ~ 'eax'
-:lexeme ~ <MSVS_ASM_EBP>                 priority => -60
-MSVS_ASM_EBP ~ 'EBP'
-MSVS_ASM_EBP ~ 'ebp'
-:lexeme ~ <MSVS_ASM_EBX>                 priority => -60
-MSVS_ASM_EBX ~ 'EBX'
-MSVS_ASM_EBX ~ 'ebx'
-:lexeme ~ <MSVS_ASM_ECX>                 priority => -60
-MSVS_ASM_ECX ~ 'ECX'
-MSVS_ASM_ECX ~ 'ecx'
-:lexeme ~ <MSVS_ASM_EDI>                 priority => -60
-MSVS_ASM_EDI ~ 'EDI'
-MSVS_ASM_EDI ~ 'edi'
-:lexeme ~ <MSVS_ASM_EDX>                 priority => -60
-MSVS_ASM_EDX ~ 'EDX'
-MSVS_ASM_EDX ~ 'edx'
-:lexeme ~ <MSVS_ASM_EQ>                  priority => -60
-MSVS_ASM_EQ ~ 'EQ'
-MSVS_ASM_EQ ~ 'eq'
-:lexeme ~ <MSVS_ASM_ES>                  priority => -60
-MSVS_ASM_ES ~ 'ES'
-MSVS_ASM_ES ~ 'es'
-:lexeme ~ <MSVS_ASM_ESI>                 priority => -60
-MSVS_ASM_ESI ~ 'ESI'
-MSVS_ASM_ESI ~ 'esi'
-:lexeme ~ <MSVS_ASM_ESP>                 priority => -60
-MSVS_ASM_ESP ~ 'ESP'
-MSVS_ASM_ESP ~ 'esp'
-:lexeme ~ <MSVS_ASM_FAR>                 priority => -60
-MSVS_ASM_FAR ~ 'FAR'
-MSVS_ASM_FAR ~ 'far'
-:lexeme ~ <MSVS_ASM_FAR16>               priority => -60
-MSVS_ASM_FAR16 ~ 'FAR16'
-MSVS_ASM_FAR16 ~ 'far16'
-:lexeme ~ <MSVS_ASM_FAR32>               priority => -60
-MSVS_ASM_FAR32 ~ 'FAR32'
-MSVS_ASM_FAR32 ~ 'far32'
-:lexeme ~ <MSVS_ASM_FS>                  priority => -60
-MSVS_ASM_FS ~ 'FS'
-MSVS_ASM_FS ~ 'fs'
-:lexeme ~ <MSVS_ASM_FWORD>               priority => -60
-MSVS_ASM_FWORD ~ 'FWORD'
-MSVS_ASM_FWORD ~ 'fword'
-:lexeme ~ <MSVS_ASM_GE>                  priority => -60
-MSVS_ASM_GE ~ 'GE'
-MSVS_ASM_GE ~ 'ge'
-:lexeme ~ <MSVS_ASM_GS>                  priority => -60
-MSVS_ASM_GS ~ 'GS'
-MSVS_ASM_GS ~ 'gs'
-:lexeme ~ <MSVS_ASM_GT>                  priority => -60
-MSVS_ASM_GT ~ 'GT'
-MSVS_ASM_GT ~ 'gt'
-:lexeme ~ <MSVS_ASM_HIGH>                priority => -60
-MSVS_ASM_HIGH ~ 'HIGH'
-MSVS_ASM_HIGH ~ 'high'
-:lexeme ~ <MSVS_ASM_HIGHWORD>            priority => -60
-MSVS_ASM_HIGHWORD ~ 'HIGHWORD'
-MSVS_ASM_HIGHWORD ~ 'highword'
-:lexeme ~ <MSVS_ASM_LBRACKET>            priority => -60
-MSVS_ASM_LBRACKET ~ '['
-:lexeme ~ <MSVS_ASM_RBRACKET>            priority => -60
-MSVS_ASM_RBRACKET ~ ']'
-:lexeme ~ <MSVS_ASM_LE>                  priority => -60
-MSVS_ASM_LE ~ 'LE'
-MSVS_ASM_LE ~ 'le'
-:lexeme ~ <MSVS_ASM_LOCK>                priority => -60
-MSVS_ASM_LOCK ~ 'LOCK'
-MSVS_ASM_LOCK ~ 'lock'
-:lexeme ~ <MSVS_ASM_LOW>                 priority => -60
-MSVS_ASM_LOW ~ 'LOW'
-MSVS_ASM_LOW ~ 'low'
-:lexeme ~ <MSVS_ASM_LOWWORD>             priority => -60
-MSVS_ASM_LOWWORD ~ 'LOWWORD'
-MSVS_ASM_LOWWORD ~ 'lowword'
-:lexeme ~ <MSVS_ASM_LROFFSET>            priority => -60
-MSVS_ASM_LROFFSET ~ 'LROFFSET'
-MSVS_ASM_LROFFSET ~ 'lroffset'
-:lexeme ~ <MSVS_ASM_LT>                  priority => -60
-MSVS_ASM_LT ~ 'LT'
-MSVS_ASM_LT ~ 'lt'
-:lexeme ~ <MSVS_ASM_MINUS>               priority => -60
-MSVS_ASM_MINUS ~ '-'
-:lexeme ~ <MSVS_ASM_NE>                  priority => -60
-MSVS_ASM_NE ~ 'NE'
-MSVS_ASM_NE ~ 'ne'
-:lexeme ~ <MSVS_ASM_NEAR>                priority => -60
-MSVS_ASM_NEAR ~ 'NEAR'
-MSVS_ASM_NEAR ~ 'near'
-:lexeme ~ <MSVS_ASM_NEAR16>              priority => -60
-MSVS_ASM_NEAR16 ~ 'NEAR16'
-MSVS_ASM_NEAR16 ~ 'near16'
-:lexeme ~ <MSVS_ASM_NEAR32>              priority => -60
-MSVS_ASM_NEAR32 ~ 'NEAR32'
-MSVS_ASM_NEAR32 ~ 'near32'
-:lexeme ~ <MSVS_ASM_OFFSET>              priority => -60
-MSVS_ASM_OFFSET ~ 'OFFSET'
-MSVS_ASM_OFFSET ~ 'offset'
-:lexeme ~ <MSVS_ASM_PLUS>                priority => -60
-MSVS_ASM_PLUS ~ '+'
-:lexeme ~ <MSVS_ASM_PTR>                 priority => -60
-MSVS_ASM_PTR ~ 'PTR'
-MSVS_ASM_PTR ~ 'ptr'
-:lexeme ~ <MSVS_ASM_QWORD>               priority => -60
-MSVS_ASM_QWORD ~ 'QWORD'
-MSVS_ASM_QWORD ~ 'qword'
-:lexeme ~ <MSVS_ASM_REAL10>              priority => -60
-MSVS_ASM_REAL10 ~ 'REAL10'
-MSVS_ASM_REAL10 ~ 'real10'
-:lexeme ~ <MSVS_ASM_REAL4>               priority => -60
-MSVS_ASM_REAL4 ~ 'REAL4'
-MSVS_ASM_REAL4 ~ 'real4'
-:lexeme ~ <MSVS_ASM_REAL8>               priority => -60
-MSVS_ASM_REAL8 ~ 'REAL8'
-MSVS_ASM_REAL8 ~ 'real8'
-:lexeme ~ <MSVS_ASM_WORD>                priority => -60
-MSVS_ASM_WORD ~ 'WORD'
-MSVS_ASM_WORD ~ 'word'
-:lexeme ~ <MSVS_ASM_TR7>                 priority => -60
-MSVS_ASM_TR7 ~ 'TR7'
-MSVS_ASM_TR7 ~ 'tr7'
-:lexeme ~ <MSVS_ASM_TR6>                 priority => -60
-MSVS_ASM_TR6 ~ 'TR6'
-MSVS_ASM_TR6 ~ 'tr6'
-:lexeme ~ <MSVS_ASM_TR5>                 priority => -60
-MSVS_ASM_TR5 ~ 'TR5'
-MSVS_ASM_TR5 ~ 'tr5'
-:lexeme ~ <MSVS_ASM_TR4>                 priority => -60
-MSVS_ASM_TR4 ~ 'TR4'
-MSVS_ASM_TR4 ~ 'tr4'
-:lexeme ~ <MSVS_ASM_TR3>                 priority => -60
-MSVS_ASM_TR3 ~ 'TR3'
-MSVS_ASM_TR3 ~ 'tr3'
-:lexeme ~ <MSVS_ASM_THIS>                priority => -60
-MSVS_ASM_THIS ~ 'THIS'
-MSVS_ASM_THIS ~ 'this'
-:lexeme ~ <MSVS_ASM_TBYTE>               priority => -60
-MSVS_ASM_TBYTE ~ 'TBYTE'
-MSVS_ASM_TBYTE ~ 'tbyte'
-:lexeme ~ <MSVS_ASM_SWORD>               priority => -60
-MSVS_ASM_SWORD ~ 'SWORD'
-MSVS_ASM_SWORD ~ 'sword'
-:lexeme ~ <MSVS_ASM_SS>                  priority => -60
-MSVS_ASM_SS ~ 'SS'
-MSVS_ASM_SS ~ 'ss'
-:lexeme ~ <MSVS_ASM_SP>                  priority => -60
-MSVS_ASM_SP ~ 'SP'
-MSVS_ASM_SP ~ 'sp'
-:lexeme ~ <MSVS_ASM_SI>                  priority => -60
-MSVS_ASM_SI ~ 'SI'
-MSVS_ASM_SI ~ 'si'
-:lexeme ~ <MSVS_ASM_SDWORD>              priority => -60
-MSVS_ASM_SDWORD ~ 'SDWORD'
-MSVS_ASM_SDWORD ~ 'sdword'
-:lexeme ~ <MSVS_ASM_SBYTE>               priority => -60
-MSVS_ASM_SBYTE ~ 'SBYTE'
-MSVS_ASM_SBYTE ~ 'sbyte'
 
 ##########################################################
 # GCC EXTENSIONS
@@ -1590,204 +1317,21 @@ offsetofMemberDesignator ::=   IDENTIFIER_UNAMBIGUOUS
                                | offsetofMemberDesignator DOT IDENTIFIER_UNAMBIGUOUS
                                | offsetofMemberDesignator LBRACKET expression RBRACKET
 
-#
+######################
 # Microsoft Extensions
-#
-msvsAttribute ::= MSVS_ASM | MSVS_FASTCALL | MSVS_BASED | MSVS_CDECL | MSVS_CLRCALL | MSVS_STDCALL | MSVS_THISCALL
+######################
+msvsAttribute ::= MSVS_FASTCALL | MSVS_BASED | MSVS_CDECL | MSVS_CLRCALL | MSVS_STDCALL | MSVS_THISCALL
 
 msvsBuiltinType ::=  MSVS_INT8
                   | MSVS_INT16
                   | MSVS_INT32
                   | MSVS_INT64
 
-msvsAsmStatementDirectiveList ::= msvsAsmDirective+
 
-msvsAsmStatement ::= MSVS_ASM msvsAsmDirective
-                   | MSVS_ASM
-                     LCURLY
-                     msvsAsmStatementDirectiveList
-                     RCURLY
-
-msvsAsmDirective ::= msvsAsmLabelDef msvsAsmSegmentDirective
-                   | msvsAsmSegmentDirective
-                   | msvsAsmLabelDef
-
-msvsAsmLabelDef ::= IDENTIFIER_UNAMBIGUOUS COLON
-                  | IDENTIFIER_UNAMBIGUOUS COLON COLON
-                  | MSVS_AT MSVS_AT COLON
-
-#
-# msvsAsmSegmentDirective ::=   msvsAsmInstruction
-#                                | msvsAsmDataDirective
-#                                | msvsAsmControlDirective
-#                                | msvsAsmStartupDirective
-#                                | msvsAsmExitDirective
-#                                | msvsAsmOffsetDirective
-#                                | msvsAsmLabelDirective
-#                                | msvsAsmProcDirective
-#                                  ( msvsAsmLocalDirective )*
-#                                  ( msvsAsmDirective )*
-#                                  msvsAsmEndpDirective
-#                                | msvsAsmInvokeDirective
-#                                | msvsAsmGeneralDirective
-#
-# The full MASM instruction set is not supported.
-#
-msvsAsmSegmentDirective ::=   msvsAsmInstruction
-
-msvsAsmExprList ::= msvsAsmExpr
-                  | msvsAsmExprList COMMA msvsAsmExpr
-
-msvsAsmInstruction ::= msvsAsmInstrPrefix msvsAsmMnemonic msvsAsmExprList
-                     | msvsAsmInstrPrefix msvsAsmMnemonic
-                     | msvsAsmMnemonic msvsAsmExprList
-                     | msvsAsmMnemonic
-
-msvsAsmInstrPrefix ::= MSVS_ASM_REP | MSVS_ASM_REPE | MSVS_ASM_REPZ | MSVS_ASM_REPNE | MSVS_ASM_REPNZ | MSVS_ASM_LOCK
-
-msvsAsmMnemonic ::= IDENTIFIER_UNAMBIGUOUS | MSVS_ASM_AND | MSVS_ASM_MOD | MSVS_ASM_NOT | MSVS_ASM_OR | MSVS_ASM_SEG | MSVS_ASM_SHL | MSVS_ASM_SHLD | MSVS_ASM_MOV | MSVS_ASM_SHR | MSVS_ASM_XOR
-
-#
-# msvsAsmExpr ::=   MSVS_ASM_SHORT  msvsAsmExpr05
-#                   | msvsAsmDotType  msvsAsmExpr01
-#                   | MSVS_ASM_OPATTR msvsAsmExpr01
-#                   | msvsAsmExpr01
-#
-# The full MASM instruction set is not supported.
-#/
-msvsAsmExpr ::= msvsAsmExpr01
-
-msvsAsmExpr01 ::=  msvsAsmExpr01 MSVS_ASM_OR  msvsAsmExpr02
-                    | msvsAsmExpr01 MSVS_ASM_XOR msvsAsmExpr02
-                    | msvsAsmExpr02
-
-msvsAsmExpr02 ::=   msvsAsmExpr02 MSVS_ASM_AND msvsAsmExpr03
-                    | msvsAsmExpr03
-
-msvsAsmExpr03 ::=   MSVS_ASM_NOT msvsAsmExpr04
-                    | msvsAsmExpr04
-
-msvsAsmExpr04 ::=   msvsAsmExpr04 MSVS_ASM_EQ msvsAsmExpr05
-                    | msvsAsmExpr04 MSVS_ASM_NE msvsAsmExpr05
-                    | msvsAsmExpr04 MSVS_ASM_LT msvsAsmExpr05
-                    | msvsAsmExpr04 MSVS_ASM_LE msvsAsmExpr05
-                    | msvsAsmExpr04 MSVS_ASM_GT msvsAsmExpr05
-                    | msvsAsmExpr04 MSVS_ASM_GE msvsAsmExpr05
-                    | msvsAsmExpr05
-
-msvsAsmExpr05 ::=   msvsAsmExpr05 MSVS_ASM_PLUS msvsAsmExpr06
-                    | msvsAsmExpr05 MSVS_ASM_MINUS msvsAsmExpr06
-                    | msvsAsmExpr06
-
-msvsAsmExpr06 ::=   msvsAsmExpr06 MSVS_ASM_STAR  msvsAsmExpr07
-                    | msvsAsmExpr06 MSVS_ASM_SLASH msvsAsmExpr07
-                    | msvsAsmExpr06 MSVS_ASM_MOD   msvsAsmExpr07
-                    | msvsAsmExpr06 MSVS_ASM_SHR   msvsAsmExpr07
-                    | msvsAsmExpr06 MSVS_ASM_SHL   msvsAsmExpr07
-                    | msvsAsmExpr06 MSVS_ASM_MOV   msvsAsmExpr07
-                    | msvsAsmExpr07
-
-msvsAsmExpr07 ::=   MSVS_ASM_PLUS  msvsAsmExpr08
-                    | MSVS_ASM_MINUS msvsAsmExpr08
-                    | msvsAsmExpr08
-
-msvsAsmExpr08 ::=   MSVS_ASM_HIGH     msvsAsmExpr09
-                    | MSVS_ASM_LOW      msvsAsmExpr09
-                    | MSVS_ASM_HIGHWORD msvsAsmExpr09
-                    | MSVS_ASM_LOWWORD  msvsAsmExpr09
-                    | msvsAsmExpr09
-
-#
-# .type could eat C lexemes DOT and IDENTIFIER_UNAMBIGUOUS. Since we do not really mind about
-# MSVS __asm accuracy, this is splitted explicitely into '.' and '.type'
-#
-msvsAsmDotType ::= MSVS_ASM_DOT MSVS_ASM_TYPE
-
-msvsAsmExpr09 ::=   MSVS_ASM_OFFSET   msvsAsmExpr10
-                    | MSVS_ASM_SEG      msvsAsmExpr10
-                    | MSVS_ASM_LROFFSET msvsAsmExpr10
-                    | msvsAsmDotType    msvsAsmExpr10
-                    | MSVS_ASM_THIS     msvsAsmExpr10
-                    | msvsAsmExpr09 MSVS_ASM_PTR msvsAsmExpr10
-                    | msvsAsmExpr09 MSVS_ASM_COLON   msvsAsmExpr10
-                    | msvsAsmExpr10
-
-msvsAsmExpr10 ::=   msvsAsmExpr10 MSVS_ASM_DOT msvsAsmExpr11
-                    | msvsAsmExpr10 MSVS_ASM_LBRACKET msvsAsmExpr MSVS_ASM_RBRACKET
-                    | msvsAsmExpr11
-
-#
-# msvsAsmExpr11 ::=   LPAREN msvsAsmExpr RPAREN
-#                     | MSVS_ASM_LBRACKET msvsAsmExpr MSVS_ASM_RBRACKET
-#                     | MSVS_ASM_WIDTH IDENTIFIER_UNAMBIGUOUS
-#                     | MSVS_ASM_MASK  IDENTIFIER_UNAMBIGUOUS
-#                     | MSVS_ASM_SIZE    msvsAsmSizeArg
-#                     | MSVS_ASM_SIZEOF  msvsAsmSizeArg
-#                     | MSVS_ASM_LENGTH   IDENTIFIER_UNAMBIGUOUS
-#                     | MSVS_ASM_LENGTHOF IDENTIFIER_UNAMBIGUOUS
-#                     | msvsAsmEecordConst
-#                     | msvsAsmString
-#                     | msvsAsmConstant
-#                     | msvsAsmType
-#                     | IDENTIFIER_UNAMBIGUOUS
-#                     | MSVS_ASM_DOLLAR
-#                     | msvsAsmSegmentRegister
-#                     | msvsAsmRegister
-#                     | MSVS_ASM_ST
-#                     | MSVS_ASM_ST LPAREN msvsAsmExpr RPAREN
-#
-# The full MASM instruction set is not supported.
-#
-msvsAsmExpr11 ::=   LPAREN msvsAsmExpr RPAREN
-                    | MSVS_ASM_LBRACKET msvsAsmExpr MSVS_ASM_RBRACKET
-                    | msvsAsmConstant
-                    | msvsAsmType
-                    | IDENTIFIER_UNAMBIGUOUS
-                    | MSVS_ASM_DOLLAR
-                    | msvsAsmSegmentRegister
-                    | msvsAsmRegister
-
-msvsAsmType ::=   IDENTIFIER_UNAMBIGUOUS
-                  | msvsAsmDistance
-                  | msvsAsmDataType
-
-msvsAsmDistance ::=   msvsAsmNearfar
-                      | MSVS_ASM_NEAR16
-                      | MSVS_ASM_NEAR32
-                      | MSVS_ASM_FAR16
-                      | MSVS_ASM_FAR32
-
-msvsAsmNearfar ::= MSVS_ASM_NEAR | MSVS_ASM_FAR
-
-msvsAsmDataType ::=   MSVS_ASM_BYTE
-                       | MSVS_ASM_SBYTE
-                       | MSVS_ASM_WORD
-                       | MSVS_ASM_SWORD
-                       | MSVS_ASM_DWORD
-                       | MSVS_ASM_SDWORD
-                       | MSVS_ASM_FWORD
-                       | MSVS_ASM_QWORD
-                       | MSVS_ASM_TBYTE
-                       | MSVS_ASM_REAL4
-                       | MSVS_ASM_REAL8
-                       | MSVS_ASM_REAL10
-
-msvsAsmSegmentRegister ::= MSVS_ASM_CS | MSVS_ASM_DS | MSVS_ASM_ES | MSVS_ASM_FS | MSVS_ASM_GS | MSVS_ASM_SS
-
-msvsAsmRegister ::=   msvsAsmSpecialRegister
-                      | msvsAsmGpRegister
-                      | msvsAsmByteRegister
-
-msvsAsmSpecialRegister ::=   MSVS_ASM_CR0 | MSVS_ASM_CR2 | MSVS_ASM_CR3
-                              | MSVS_ASM_DR0 | MSVS_ASM_DR1 | MSVS_ASM_DR2 | MSVS_ASM_DR3 | MSVS_ASM_DR6 | MSVS_ASM_DR7
-                              | MSVS_ASM_TR3 | MSVS_ASM_TR4 | MSVS_ASM_TR5 | MSVS_ASM_TR6 | MSVS_ASM_TR7
-
-msvsAsmGpRegister ::=   MSVS_ASM_AX | MSVS_ASM_EAX | MSVS_ASM_BX | MSVS_ASM_EBX | MSVS_ASM_CX | MSVS_ASM_ECX | MSVS_ASM_DX | MSVS_ASM_EDX
-                         | MSVS_ASM_BP | MSVS_ASM_EBP | MSVS_ASM_SP | MSVS_ASM_ESP | MSVS_ASM_DI | MSVS_ASM_EDI | MSVS_ASM_SI | MSVS_ASM_ESI
-
-msvsAsmByteRegister ::= MSVS_ASM_AL | MSVS_ASM_AH | MSVS_ASM_BL | MSVS_ASM_BH | MSVS_ASM_CL | MSVS_ASM_CH | MSVS_ASM_DL | MSVS_ASM_DH
-
-msvsAsmConstant ::= I_CONSTANT
+######################
+# Opaque ASM Statement
+######################
+opaqueAsmStatement ::= ANY_ASM ASM_OPAQUE
 
 ###############################################################################################
 # Discard simple preprocessor directives (on one line - cpp output persist to get some of them)

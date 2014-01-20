@@ -40,6 +40,7 @@ my @modules = qw(
   Regexp::Common
   SUPER
   Scalar::Util
+  String::ShellQuote
   Term::ProgressBar
   Test::Differences
   Test::More
