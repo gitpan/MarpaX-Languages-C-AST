@@ -37,6 +37,7 @@ lib/MarpaX/Languages/C/Scan.pm
 t/00-compile.t
 t/00-report-prereqs.t
 t/asm-opaque.t
+t/delayed_directDeclaratorIdentifier.t
 t/discard_GCC_attribute.t
 t/discard_MSVS_declspec.t
 t/discard_MSVS_pragma.t

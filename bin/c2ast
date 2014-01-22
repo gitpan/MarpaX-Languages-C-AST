@@ -22,7 +22,7 @@ autoflush STDOUT 1;
 
 # ABSTRACT: C source analysis
 
-our $VERSION = '0.33'; # TRIAL VERSION
+our $VERSION = '0.34'; # VERSION
 
 # PODNAME: c2ast
 
@@ -67,10 +67,10 @@ Log::Log4perl::init(\$defaultLog4perlConf);
 Log::Any::Adapter->set('Log4perl');
 
 if ($help) {
-    pod2usage(-exitval => EXIT_SUCCESS);
+    pod2usage(-verbose => 2, -noperldoc => 1, -exitval => EXIT_SUCCESS);
 }
 if (! @ARGV) {
-    pod2usage(-exitval => EXIT_FAILURE)
+    pod2usage(-verbose => 2, -noperldoc => 1, -exitval => EXIT_FAILURE)
 }
 
 my $preprocessedOutput;
@@ -317,7 +317,7 @@ c2ast - C source analysis
 
 =head1 VERSION
 
-version 0.33
+version 0.34
 
 =head1 SYNOPSIS
 

@@ -8,7 +8,7 @@ use IO::String;
 
 # ABSTRACT: ISO ANSI C 2011 grammar written in Marpa BNF
 
-our $VERSION = '0.33'; # TRIAL VERSION
+our $VERSION = '0.34'; # VERSION
 
 
 our %DEFAULT_PAUSE = (
@@ -17,6 +17,7 @@ our %DEFAULT_PAUSE = (
     IDENTIFIER           => 'before',
     SEMICOLON            => 'after',
     LCURLY_SCOPE         => 'after',
+    LCURLY_REENTERSCOPE  => 'after',
     RCURLY_SCOPE         => 'after',
     COMMA                => 'after',
     EQUAL                => 'after',
@@ -110,7 +111,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011 - ISO ANSI C 2011 grammar wr
 
 =head1 VERSION
 
-version 0.33
+version 0.34
 
 =head1 SYNOPSIS
 
@@ -243,7 +244,7 @@ gccAlignofExpression ::= GCC_ALIGNOF unaryExpression
 
 unaryExpression
 	::= postfixExpression
-	| (gccExtension) postfixExpression
+	| gccExtension postfixExpression
 	| INC_OP unaryExpression
 	| DEC_OP unaryExpression
 	| unaryOperator castExpression
@@ -377,7 +378,7 @@ gccExtension ::= GCC_EXTENSION
 #                            | typeQualifier
 #                            | functionSpecifier
 #                            | alignmentSpecifier
-#                            | (gccExtension)
+#                            | gccExtension
 
 declarationSpecifiers ::= declarationSpecifiers0
                         | declarationSpecifiers1
@@ -392,8 +393,8 @@ declarationSpecifiers0 ::=       # List without type specifiers
                          | declarationSpecifiers0 functionSpecifier
                          | alignmentSpecifier
                          | declarationSpecifiers0 alignmentSpecifier
-                         | (gccExtension)
-                         | declarationSpecifiers0 (gccExtension)
+                         | gccExtension
+                         | declarationSpecifiers0 gccExtension
 
 declarationSpecifiers1 ::=       # List with a single typeSpecifier1
                            typeSpecifier1
@@ -402,7 +403,7 @@ declarationSpecifiers1 ::=       # List with a single typeSpecifier1
                          | declarationSpecifiers1 typeQualifier
                          | declarationSpecifiers1 functionSpecifier
                          | declarationSpecifiers1 alignmentSpecifier
-                         | declarationSpecifiers1 (gccExtension)
+                         | declarationSpecifiers1 gccExtension
 
 declarationSpecifiers2 ::=       # List with one or more typeSpecifier2
                            typeSpecifier2
@@ -412,7 +413,7 @@ declarationSpecifiers2 ::=       # List with one or more typeSpecifier2
                          | declarationSpecifiers2 typeQualifier
                          | declarationSpecifiers2 functionSpecifier
                          | declarationSpecifiers2 alignmentSpecifier
-                         | declarationSpecifiers2 (gccExtension)
+                         | declarationSpecifiers2 gccExtension
 
 # declarationSpecifiers ::= declarationSpecifiersUnit+
 
@@ -488,7 +489,7 @@ structDeclaration
 
 #specifierQualifierListUnit ::= typeSpecifier
 #                             | typeQualifier
-#                             | (gccExtension)
+#                             | gccExtension
 
 # specifierQualifierList ::= specifierQualifierListUnit+
 
@@ -499,21 +500,21 @@ specifierQualifierList ::= specifierQualifierList0
 specifierQualifierList0 ::= # List without type specifiers
                             typeQualifier
                           | specifierQualifierList0 typeQualifier
-                          | (gccExtension)
-                          | specifierQualifierList0 (gccExtension)
+                          | gccExtension
+                          | specifierQualifierList0 gccExtension
 
 specifierQualifierList1 ::= # List with a single typeSpecifier1
                             typeSpecifier1
                           | specifierQualifierList0 typeSpecifier1
                           | specifierQualifierList1 typeQualifier
-                          | specifierQualifierList1 (gccExtension)
+                          | specifierQualifierList1 gccExtension
 
 specifierQualifierList2 ::= # List with one or more typeSpecifier2
                             typeSpecifier2
                           | specifierQualifierList0 typeSpecifier2
                           | specifierQualifierList2 typeSpecifier2
                           | specifierQualifierList2 typeQualifier
-                          | specifierQualifierList2 (gccExtension)
+                          | specifierQualifierList2 gccExtension
 
 structDeclaratorList
 	::= structDeclarator
@@ -746,8 +747,8 @@ externalDeclaration
 	::= functionDefinition
 	| declaration
 
-compoundStatementReenterScope ::= LCURLY RCURLY_SCOPE
-	                        | LCURLY blockItemList RCURLY_SCOPE
+compoundStatementReenterScope ::= LCURLY_REENTERSCOPE RCURLY_SCOPE
+	                        | LCURLY_REENTERSCOPE blockItemList RCURLY_SCOPE
 
 functionDefinition
 	::= functionDefinitionCheck1
@@ -1022,28 +1023,48 @@ EQ_OP        ~ '=='
 NE_OP        ~ '!='
 :lexeme ~ <SEMICOLON>     priority => -126
 SEMICOLON                     ~ ';'
-:lexeme ~ <LCURLY>        priority => -127
-LCURLY                       ~ '{' | '<%'
+#
+# LCURLY factorization
+#
+_LCURLY      ~ '{' | '<%'
+:lexeme ~ <LCURLY>              priority => -127
 :lexeme ~ <LCURLY_SCOPE>        priority => -127
-LCURLY_SCOPE                       ~ '{' | '<%'
+:lexeme ~ <LCURLY_REENTERSCOPE> priority => -127
+LCURLY              ~ _LCURLY
+LCURLY_SCOPE        ~ _LCURLY
+LCURLY_REENTERSCOPE ~ _LCURLY
+#
+# LCURLY factorization
+#
+_RCURLY ~ '}' | '%>'
 :lexeme ~ <RCURLY>        priority => -128
-RCURLY                       ~ '}' | '%>'
 :lexeme ~ <RCURLY_SCOPE>        priority => -128
-RCURLY_SCOPE                       ~ '}' | '%>'
+RCURLY       ~ _RCURLY
+RCURLY_SCOPE ~ _RCURLY
+
 :lexeme ~ <COMMA>         priority => -129
 COMMA                     ~ ','
 :lexeme ~ <COLON>         priority => -130
 COLON                      ~ ':'
 :lexeme ~ <EQUAL>         priority => -131
 EQUAL       ~ '='
+#
+# LPAREN factorization
+#
+_LPAREN ~ '('
 :lexeme ~ <LPAREN>        priority => -132
-LPAREN                ~ '('
 :lexeme ~ <LPAREN_SCOPE>        priority => -132
-LPAREN_SCOPE                ~ '('
+LPAREN       ~ _LPAREN
+LPAREN_SCOPE ~ _LPAREN
+#
+# RPAREN factorization
+#
+_RPAREN ~ ')'
 :lexeme ~ <RPAREN>        priority => -133
-RPAREN                      ~ ')'
 :lexeme ~ <RPAREN_SCOPE>        priority => -133
-RPAREN_SCOPE                      ~ ')'
+RPAREN       ~ _RPAREN
+RPAREN_SCOPE ~ _RPAREN
+
 :lexeme ~ <LBRACKET>      priority => -134
 LBRACKET      ~ '[' | '<:'
 :lexeme ~ <RBRACKET>      priority => -135

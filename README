@@ -2,7 +2,7 @@ NAME
     MarpaX::Languages::C::AST - Translate a C source to an AST
 
 VERSION
-    version 0.33
+    version 0.34
 
 SYNOPSIS
         use strict;
@@ -109,6 +109,12 @@ SUBROUTINES/METHODS
 INCOMPATIBILITIES
     Since version 0.30, the c2ast.pl script is named c2ast (i.e. without
     extension).
+
+NOTES
+    C code can have inline ASM code. The GCC Inline Assembly is fully
+    supported, any other is falling into a heuristic that should catch
+    everything needed. CL inline assemblies have been targetted in
+    particular.
 
 SEE ALSO
     Log::Any, Marpa::R2

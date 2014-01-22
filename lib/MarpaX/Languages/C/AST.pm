@@ -17,7 +17,7 @@ use Regexp::Common qw/comment delimited/;
 our $WS_RE = qr/[ \t\v\n\f]/;          # C.f. doAsmOpaque()
 our $ASM_COMMENT_RE = qr/(?:;[^\n]*|$RE{comment}{'C++'})/;
 
-our $VERSION = '0.33'; # TRIAL VERSION
+our $VERSION = '0.34'; # VERSION
 
 
 # ----------------------------------------------------------------------------------------
@@ -603,7 +603,7 @@ MarpaX::Languages::C::AST - Translate a C source to an AST
 
 =head1 VERSION
 
-version 0.33
+version 0.34
 
 =head1 SYNOPSIS
 
@@ -710,6 +710,10 @@ Return the blessed value. Takes as optional parameter a flag saying if the retur
 =head1 INCOMPATIBILITIES
 
 Since version 0.30, the c2ast.pl script is named c2ast (i.e. without extension).
+
+=head1 NOTES
+
+C code can have inline ASM code. The GCC Inline Assembly is fully supported, any other is falling into a heuristic that should catch everything needed. CL inline assemblies have been targetted in particular.
 
 =head1 SEE ALSO
 
