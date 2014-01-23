@@ -12,7 +12,7 @@ use Carp qw/croak/;
 # Marpa follows Unicode recommendation, i.e. perl's \R, that cannot be in a character class
 our $NEWLINE_REGEXP = qr/(?>\x0D\x0A|\v)/;
 
-our $VERSION = '0.34'; # VERSION
+our $VERSION = '0.35'; # VERSION
 # CONTRIBUTORS
 
 our @EXPORT_OK = qw/whoami whowasi traceAndUnpack logCroak showLineAndCol lineAndCol lastCompleted startAndLength/;
@@ -120,10 +120,12 @@ sub showLineAndCol {
 
 
 sub lineAndCol {
-    my ($impl, $g1) = @_;
+    my ($impl, $g1, $start) = @_;
 
-    $g1 //= $impl->current_g1_location();
-    my ($start, $length) = $impl->g1_location_to_span($g1);
+    if (! defined($start)) {
+      $g1 //= $impl->current_g1_location();
+      ($start, undef) = $impl->g1_location_to_span($g1);
+    }
     my ($line, $column) = $impl->line_column($start);
     return [ $line, $column ];
 }
@@ -158,7 +160,7 @@ MarpaX::Languages::C::AST::Util - C Translation to AST - Class method utilities
 
 =head1 VERSION
 
-version 0.34
+version 0.35
 
 =head1 SYNOPSIS
 
@@ -204,7 +206,7 @@ Returns a string showing the request line, followed by another string that shows
 
 =head2 lineAndCol($impl, $g1)
 
-Returns the output of Marpa's line_column at a given $g1 location. Default $g1 is Marpa's current_g1_location().
+Returns the output of Marpa's line_column at a given $g1 location. Default $g1 is Marpa's current_g1_location(). If $start is given, $g1 is ignored.
 
 =head2 startAndLength($impl, $g1)
 

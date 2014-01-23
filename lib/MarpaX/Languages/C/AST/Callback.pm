@@ -34,7 +34,7 @@ use Class::Struct
 
 use Carp qw/croak/;
 
-our $VERSION = '0.34'; # VERSION
+our $VERSION = '0.35'; # VERSION
 
 
 sub _sort_by_option_priority_desc {
@@ -150,6 +150,8 @@ sub _unregister {
 
     }
 
+    return;
+
 }
 
 sub unregister {
@@ -157,10 +159,12 @@ sub unregister {
 
   my $firing = $self->firing() || 0;
   if (! $firing) {
-      return $self->_unregister(@_);
+      $self->_unregister(@_);
   } else {
       push(@{$self->cb_unregistered}, @_);
   }
+
+  return;
 }
 
 sub exec {
@@ -203,6 +207,8 @@ sub exec {
   #
   $self->_unregister(@{$self->cb_unregistered});
   $self->cb_unregistered([]);
+
+  return;
 }
 
 sub _inventory_condition_tofire {
@@ -336,6 +342,8 @@ sub cache {
   $self->hscratchpad('_cacheCbMethod_void', \@cacheCbMethod_void);
 
   $self->hscratchpad('_cache', 1);
+
+  return;
 }
 
 sub _fire {
@@ -416,6 +424,8 @@ sub _fire {
   }
 
   $self->firing(0);
+
+  return;
 }
 
 sub topic_level_fired_data {
@@ -470,6 +480,8 @@ sub _inventory_initialize_topic {
   $self->topic_fired($keep_topic_firedp);
   $self->topic_fired_persistence($keep_topic_fired_persistencep);
   $self->topic_fired_data($keep_topic_fired_datap);
+
+  return;
 }
 
 sub _inventory_initialize_tofire {
@@ -480,6 +492,7 @@ sub _inventory_initialize_tofire {
   if (defined($__PACKAGE__::_cachePrioritized_cb_tofirep)) {
     $__PACKAGE__::_cachePrioritized_cb_tofirep = $prioritized_cb_tofirep;
   }
+  return;
 }
 
 sub _inventory_initialize_fired {
@@ -490,6 +503,7 @@ sub _inventory_initialize_fired {
   if (defined($__PACKAGE__::_cachePrioritized_cb_firedp)) {
     $__PACKAGE__::_cachePrioritized_cb_firedp = $prioritized_cb_firedp;
   }
+  return;
 }
 
 sub _inventory_fire {
@@ -500,6 +514,7 @@ sub _inventory_fire {
   #
   $self->_inventory_initialize_topic();
   $self->_inventory();
+  return;
 }
 
 sub _inventory {
@@ -515,6 +530,7 @@ sub _inventory {
 	  $nbTopicsCreated = 0;
       }
   } while ($nbTopicsCreated > 0);
+  return;
 }
 
 sub _inventory_subscription_tofire {
@@ -642,6 +658,8 @@ sub pushTopicLevel {
   $self->topic_fired_persistence($new_topic_fired_persistencep);
   $self->topic_fired_data($new_topic_fired_datap);
 
+  return;
+
 }
 
 sub popTopicLevel {
@@ -655,6 +673,8 @@ sub popTopicLevel {
   $self->topic_fired($old_topic_firedp);
   $self->topic_fired_persistence($old_topic_persistencep);
   $self->topic_fired_data($old_topic_datap);
+
+  return;
 
 }
 
@@ -683,6 +703,8 @@ sub reset_topic_fired_data {
 	$old_topic_data->{$topic} = $value;
     }
 
+    return;
+
 }
 
 1;
@@ -699,7 +721,7 @@ MarpaX::Languages::C::AST::Callback - Simple but powerful callback generic frame
 
 =head1 VERSION
 
-version 0.34
+version 0.35
 
 =head1 DESCRIPTION
 

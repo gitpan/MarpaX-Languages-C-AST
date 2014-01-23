@@ -14,7 +14,7 @@ use constant LHS_PROCESS_EVENT => '<process>';
 use constant CLOSEANYSCOPE_PRIORITY => -1000;
 use constant RESETANYDATA_PRIORITY => -2000;
 
-our $VERSION = '0.34'; # VERSION
+our $VERSION = '0.35'; # VERSION
 
 
 sub new {
@@ -73,7 +73,7 @@ sub new {
          $self->_register_rule_callbacks({
                                           lhs => 'declarationCheck',
                                           rhs => [ [ 'declarationCheckdeclarationSpecifiers', [ [ 'storageClassSpecifierTypedef', 'typedef' ] ] ],
-                                                   [ 'declarationCheckinitDeclaratorList',    [ 'directDeclaratorIdentifier' ] ]
+                                                   [ 'declarationCheckinitDeclaratorList',    [ [ 'directDeclaratorIdentifier', sub { $outerSelf->{_lastIdentifier} } ] ] ]
                                                  ],
                                           method => \&_declarationCheck,
                                           # ---------------------------
@@ -382,7 +382,7 @@ sub _exitScopeCallback {
 }
 # ----------------------------------------------------------------------------------------
 sub _storage_helper {
-    my ($method, $callback, $eventsp, $event, $countersHashp, $fixedValue) = @_;
+    my ($method, $callback, $eventsp, $event, $countersHashp, $fixedValue, $callbackValue, $impl) = @_;
     #
     # Collect the counters
     #
@@ -395,19 +395,24 @@ sub _storage_helper {
     # The event name, by convention, is 'event$' or '^$event'
     #
     my $rc;
-    my $impl = $callback->hscratchpad('_impl');
 
+    my $g1 = $impl->current_g1_location();
+    my ($start, $length) = $impl->g1_location_to_span($g1);
     if (substr($event, 0, 1) eq '^') {
-	$rc = [ startAndLength($impl), lineAndCol($impl), %counters ];
+	$rc = [ [ $start, $length ], lineAndCol($impl, $g1, $start), %counters ];
     } elsif (substr($event, -1, 1) eq '$') {
-	substr($event, -1, 1, '');
-	$rc = [ startAndLength($impl), lineAndCol($impl), $fixedValue || lastCompleted($impl, $event), %counters ];
+        if (defined($callbackValue)) {
+          $rc = [ [ $start, $length ], lineAndCol($impl, $g1, $start), &$callbackValue() ];
+        } else {
+          substr($event, -1, 1, '');
+          $rc = [ [ $start, $length ], lineAndCol($impl, $g1, $start), $fixedValue || lastCompleted($impl, $event), %counters ];
+        }
     }
 
     return $rc;
 }
 sub _storage_helper_optimized {
-    my ($method, $callback, $eventsp, $event, $countersHashp, $fixedValue, $impl) = @_;
+    my ($method, $callback, $eventsp, $event, $countersHashp, $fixedValue, $callbackValue, $impl) = @_;
     #
     # Collect the counters
     #
@@ -421,11 +426,18 @@ sub _storage_helper_optimized {
     #
     my $rc;
 
+    my $g1 = $_[7]->current_g1_location();
+    my ($start, $length) = $_[7]->g1_location_to_span($g1);
+
     if (substr($event, 0, 1) eq '^') {
-	$rc = [ startAndLength($_[6]), lineAndCol($_[6]), %counters ];
+	$rc = [ [ $start, $length ], lineAndCol($_[7], $g1, $start), %counters ];
     } elsif (substr($event, -1, 1) eq '$') {
-	substr($event, -1, 1, '');
-	$rc = [ startAndLength($_[6]), lineAndCol($_[6]), $_[5] || lastCompleted($_[6], $event), %counters ];
+        if (defined($callbackValue)) {
+          $rc = [ [ $start, $length ], lineAndCol($_[7], $g1, $start), &$callbackValue() ];
+        } else {
+          substr($event, -1, 1, '');
+          $rc = [ [ $start, $length ], lineAndCol($_[7], $g1, $start), $_[5] || lastCompleted($_[7], $event), %counters ];
+        }
     }
 
     return $rc;
@@ -438,6 +450,11 @@ sub _inc_helper {
     my $new_value = $old_value + $increment;
 
     return $new_value;
+}
+sub _inc_helper_optimized {
+    # my ($method, $callback, $eventsp, $topic, $increment) = @_;
+
+    return (($_[1]->topic_fired_data($_[3])->[0] || 0) + $_[4]);
 }
 # ----------------------------------------------------------------------------------------
 sub _set_helper {
@@ -529,6 +546,9 @@ sub _register_rule_callbacks {
   # Create inner callback object
   #
   my $callback = MarpaX::Languages::C::AST::Callback->new(log_prefix => '  ' . $hashp->{lhs} . ' ');
+  #
+  # Propagate internal variables to all callback instances
+  #
   $callback->hscratchpad('_impl', $self->hscratchpad('_impl'));
   $callback->hscratchpad('_scope', $self->hscratchpad('_scope'));
   $callback->hscratchpad('_sourcep', $self->hscratchpad('_sourcep'));
@@ -551,7 +571,7 @@ sub _register_rule_callbacks {
                         (
                          description => $eventStart,
                          extra_description => $counter . ' [Start] ',
-                         method =>  [ \&_inc_helper, $counter, 1 ],
+                         method =>  [ \&_inc_helper_optimized, $counter, 1 ],
                          method_mode => 'replace',
                          option => MarpaX::Languages::C::AST::Callback::Option->new
                          (
@@ -567,7 +587,7 @@ sub _register_rule_callbacks {
                         (
                          description => $eventEnd,
                          extra_description => $counter . ' [End] ',
-                         method =>  [ \&_inc_helper, $counter, -1 ],
+                         method =>  [ \&_inc_helper_optimized, $counter, -1 ],
                          method_mode => 'replace',
                          option => MarpaX::Languages::C::AST::Callback::Option->new
                          (
@@ -612,11 +632,17 @@ sub _register_rule_callbacks {
   # topic with the same name: Gx
   #
   foreach (keys %genomeEvents) {
+        my ($fixedValue, $callbackValue) = (undef, undef);
+        if (ref($genomeEventValues{$_}) eq 'CODE') {
+          $callbackValue = $genomeEventValues{$_};
+        } else {
+          $fixedValue = $genomeEventValues{$_};
+        }
 	$callback->register(MarpaX::Languages::C::AST::Callback::Method->new
 			    (
 			     description => $_,
                              extra_description => "$_ [storage] ",
-			     method =>  [ \&_storage_helper_optimized, $_, $countersHashp, $genomeEventValues{$_}, $self->hscratchpad('_impl') ],
+			     method =>  [ \&_storage_helper_optimized, $_, $countersHashp, $fixedValue, $callbackValue, $self->hscratchpad('_impl') ],
 			     option => MarpaX::Languages::C::AST::Callback::Option->new
 			     (
 			      topic => {$_ => 1},
@@ -725,10 +751,7 @@ sub _register_rule_callbacks {
                    option => MarpaX::Languages::C::AST::Callback::Option->new
                    (
                     condition => [
-                                  [ sub { my ($method, $callback, $eventsp, $processEventsp) = @_;
-                                          return grep {exists($processEventsp->{$_})} @{$eventsp};
-                                        },
-                                    \%rshProcessEvents
+                                  [ sub { return grep {exists($rshProcessEvents{$_})} @{$_[2]} }
                                   ]
                                  ],
                    )
@@ -749,10 +772,7 @@ sub _register_rule_callbacks {
                    option => MarpaX::Languages::C::AST::Callback::Option->new
                    (
                     condition => [
-                                  [ sub { my ($method, $callback, $eventsp, $processEventsp) = @_;
-                                          return grep {exists($processEventsp->{$_})} @{$eventsp};
-                                        },
-                                    \%lhsProcessEvents
+                                  [ sub { return grep {exists($lhsProcessEvents{$_})} @{$_[2]} }
                                   ]
                                  ],
                     priority => $hashp->{process_priority} || 0
@@ -777,7 +797,7 @@ MarpaX::Languages::C::AST::Callback::Events - Events callback when translating a
 
 =head1 VERSION
 
-version 0.34
+version 0.35
 
 =head1 DESCRIPTION
 

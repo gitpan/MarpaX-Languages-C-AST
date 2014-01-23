@@ -8,7 +8,7 @@ use IO::String;
 
 # ABSTRACT: ISO ANSI C 2011 grammar written in Marpa BNF
 
-our $VERSION = '0.34'; # VERSION
+our $VERSION = '0.35'; # VERSION
 
 
 our %DEFAULT_PAUSE = (
@@ -111,7 +111,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011 - ISO ANSI C 2011 grammar wr
 
 =head1 VERSION
 
-version 0.34
+version 0.35
 
 =head1 SYNOPSIS
 
@@ -572,6 +572,10 @@ declarator
         #
         | MSVS___C_ASSERT__ LBRACKET expression RBRACKET
 
+#
+# It is VERY important that directDeclaratorIdentifier remains forever an LHS
+# with a single RHS: IDENTIFIER, c.f. comment in AST.pm
+#
 event 'directDeclaratorIdentifier$' = completed <directDeclaratorIdentifier>
 directDeclaratorIdentifier
 	::= IDENTIFIER
