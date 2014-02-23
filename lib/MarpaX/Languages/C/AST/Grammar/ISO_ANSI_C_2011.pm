@@ -8,7 +8,7 @@ use IO::String;
 
 # ABSTRACT: ISO ANSI C 2011 grammar written in Marpa BNF
 
-our $VERSION = '0.35'; # VERSION
+our $VERSION = '0.36'; # TRIAL VERSION
 
 
 our %DEFAULT_PAUSE = (
@@ -29,7 +29,7 @@ our %DEFAULT_PAUSE = (
 our $DATA = do {local $/; <DATA>};
 
 sub new {
-  my ($class, $pausep) = @_;
+  my ($class, $pausep, $start) = @_;
 
   my $self  = {
     _grammar_option => {action_object  => sprintf('%s::%s', __PACKAGE__, 'Actions')},
@@ -51,6 +51,7 @@ sub new {
 
   $self->{_content} = '';
   my $allb = exists($pause{__ALL__});
+  $start ||= 'translationUnit';
   my $data = IO::String->new($DATA);
   while (defined($_ = <$data>)) {
       my $line = $_;
@@ -75,6 +76,8 @@ sub new {
       }
       $self->{_content} .= $line;
   }
+
+  $self->{_content} =~ s/\$START\n/$start/;
 
   bless($self, $class);
 
@@ -111,7 +114,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011 - ISO ANSI C 2011 grammar wr
 
 =head1 VERSION
 
-version 0.35
+version 0.36
 
 =head1 SYNOPSIS
 
@@ -127,13 +130,13 @@ version 0.35
 
 =head1 DESCRIPTION
 
-This modules returns describes the ISO ANSI C 2011 C grammar written in Marpa BNF, as of L<http://www.quut.com/c/ANSI-C-grammar-y-2011.html> and L<http://www.quut.com/c/ANSI-C-grammar-l.html>.
+This modules contains the ISO ANSI C 2011 C grammar written in Marpa BNF, as of L<http://www.quut.com/c/ANSI-C-grammar-y-2011.html> and L<http://www.quut.com/c/ANSI-C-grammar-l.html>.
 
 =head1 SUBROUTINES/METHODS
 
-=head2 new([$pausep])
+=head2 new([$pausep, $start])
 
-Instance a new object. Takes a reference to a HASH for lexemes for which a pause after is requested.
+Instance a new object. Takes an eventual reference to a HASH for lexemes for which a pause after is requested, followed by an eventual start rule. Default paused lexemes is hardcoded to a list of lexeme that must always be paused, and this list cannot be altered. Default start rule is 'translationUnit'.
 
 =head2 content()
 
@@ -173,12 +176,12 @@ __DATA__
 # Defaults
 #
 :default ::= action => [values] bless => ::lhs
-lexeme default = action => [start,length,value]
+lexeme default = action => [start,length,value] forgiving => 1
 
 #
 # G1 (grammar), c.f. http://www.quut.com/c/ANSI-C-grammar-y-2011.html
 #
-:start ::= translationUnit
+:start ::= $START
 
 primaryExpression
 	::= IDENTIFIER
@@ -1360,7 +1363,6 @@ opaqueAsmStatement ::= ANY_ASM ASM_OPAQUE
 
 ###############################################################################################
 # Discard simple preprocessor directives (on one line - cpp output persist to get some of them)
-# Too bad if AST.pm did not catched it after a pause lexeme
 ###############################################################################################
 <Cpp style directive start> ~ '#'
 <Cpp style directive interior single line> ~ [^\n]*

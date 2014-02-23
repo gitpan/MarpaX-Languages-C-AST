@@ -20,6 +20,7 @@ my @modules = qw(
   Exporter
   ExtUtils::MakeMaker
   File::Basename
+  File::Slurp
   File::Spec
   File::Spec::Functions
   File::Temp

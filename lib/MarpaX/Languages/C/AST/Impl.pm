@@ -6,11 +6,11 @@ package MarpaX::Languages::C::AST::Impl;
 # ABSTRACT: Implementation of Marpa's interface
 
 # use MarpaX::Languages::C::AST::Util qw/traceAndUnpack/;
-use Marpa::R2 2.078000;
+use Marpa::R2 2.080000;
 use Carp qw/croak/;
 use MarpaX::Languages::C::AST::Impl::Logger;
 
-our $VERSION = '0.35'; # VERSION
+our $VERSION = '0.36'; # TRIAL VERSION
 
 our $MARPA_TRACE_FILE_HANDLE;
 our $MARPA_TRACE_BUFFER;
@@ -124,6 +124,16 @@ sub lexeme_read {
 }
 
 
+sub lexeme_alternative {
+  return $_[0]->{recce}->lexeme_alternative(@_[1..$#_]);
+}
+
+
+sub lexeme_complete {
+  return $_[0]->{recce}->lexeme_complete(@_[1..$#_]);
+}
+
+
 sub current_g1_location {
   return $_[0]->{recce}->current_g1_location(@_[1..$#_]);
 }
@@ -157,7 +167,7 @@ MarpaX::Languages::C::AST::Impl - Implementation of Marpa's interface
 
 =head1 VERSION
 
-version 0.35
+version 0.36
 
 =head1 SYNOPSIS
 
@@ -228,6 +238,14 @@ Returns Marpa's recognizer's substring corresponding to g1 span ($start, $length
 =head2 lexeme_read($self, $lexeme, $start, $length, $value)
 
 Returns Marpa's recognizer's lexeme_read for lexeme $lexeme, at start position $start, length $length and value $value.
+
+=head2 lexeme_alternative($self, $lexeme, $value)
+
+Returns Marpa's recognizer's lexeme_alternative for lexeme $lexeme, value $value.
+
+=head2 lexeme_complete($self, $start, $length)
+
+Returns Marpa's recognizer's lexeme_complete at start position $start, length $length.
 
 =head2 current_g1_location($self)
 

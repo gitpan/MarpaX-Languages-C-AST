@@ -56,7 +56,7 @@ our %KEY2ID = (
 our @PURGE_KEYS = sort {$KEY2ID{$a} <=> $KEY2ID{$b}} grep {$KEY2ID{$_} >= $KEY2ID{_MAX}} keys %KEY2ID;
 our $PURGE_IDX  = $KEY2ID{$PURGE_KEYS[0]};
 
-our $VERSION = '0.35'; # VERSION
+our $VERSION = '0.36'; # TRIAL VERSION
 
 
 # ----------------------------------------------------------------------------------------
@@ -119,6 +119,13 @@ sub new {
 	  }
       }
   }
+  #
+  # Very internal - only for test mode: we rely on CPP output that is totally not under our
+  # control. It has been observed that #file, #line and spaces are not the same over all the
+  # different CPP implementations. #file and #line, expected. Spaces eventually being munged
+  # was less expected -;
+  #
+  $self->{_marpax_languages_c_ast_scan_test} = exists($ENV{MARPAX_LANGUAGES_C_AST_SCAN_TEST}) ? 1 : 0;
 
   bless($self, $class);
 
@@ -241,7 +248,7 @@ sub parsed_fdecls {
 	    $self->_getRcp($_, 'rt') || '',
 	    $self->_getRcp($_, 'nm') || '',
 	    $argsp,
-	    $self->_getRcp($_, 'ft') || '',
+	    $self->_getRcp($_, 'ft') // '',
 	    undef
 	   ]);
       if ($self->_definedRcp($_, 'args')) {
@@ -251,7 +258,7 @@ sub parsed_fdecls {
 		    ($self->_getRcp($_, 'func') ? $self->_getRcp($_, 'rt') : $self->_getRcp($_, 'ty')) || '',
 		    $self->_getRcp($_, 'nm') || '',
 		    undef,
-		    $self->_getRcp($_, 'ft') || '',
+		    $self->_getRcp($_, 'ft') // '',
 		    $self->_getRcp($_, 'mod') || '',
 		   ]);
 	  }
@@ -291,7 +298,7 @@ sub typedef_hash {
   foreach (@{$self->decls}) {
       if ($self->_existsRcp($_, 'typedef') && $self->_getRcp($_, 'typedef')) {
 	  my $nm = $self->_getRcp($_, 'nm');
-	  my $ft = $self->_getRcp($_, 'ft');
+	  my $ft = $self->_getRcp($_, 'ft') // '';
 	  if ($ft =~ /^\s*typedef\s*/) {
 	      #
 	      # typedef is at the beginning
@@ -356,7 +363,7 @@ sub vdecl_hash {
   foreach (@{$self->decls}) {
       if ($self->_existsRcp($_, 'extern') && $self->_getRcp($_, 'extern')) {
 	  my $nm = $self->_getRcp($_, 'nm');
-	  my $ft = $self->_getRcp($_, 'ft');
+	  my $ft = $self->_getRcp($_, 'ft') // '';
 	  if ($ft =~ /^\s*extern\s*/) {
 	      #
 	      # extern is at the beginning
@@ -439,7 +446,7 @@ sub typedef_structs {
             if ($self->_getRcp($_, 'var')) {
               push(@elements,
                    [
-                    $self->_beforeAndAfter($self->_getRcp($_, 'ft'), $self->_getRcp($_, 'nm')),
+                    $self->_beforeAndAfter($self->_getRcp($_, 'ft') // '', $self->_getRcp($_, 'nm')),
                     $self->_getRcp($_, 'nm')
                    ]
                   );
@@ -968,10 +975,14 @@ sub _pushRcp {
     #
     # - Full text and file/line information
     #
-    my ($file, $line) = ('', -1);
-    my $ft = $self->_text($stdout_buf, $o, $self->_getRcp($contextp, '_startPosition'), undef, \$file, \$line);
-    $self->_setRcp($rcp, 'ft', $ft);
-    if (! exists($ENV{MARPAX_LANGUAGES_C_AST_SCAN_TEST})) {
+    if (! $self->{_marpax_languages_c_ast_scan_test}) {
+	#
+	# This is too CPP specific and an eventual difference does NOT mean that
+	# the test is failing.
+	#
+	my ($file, $line) = ('', -1);
+	my $ft = $self->_text($stdout_buf, $o, $self->_getRcp($contextp, '_startPosition'), undef, \$file, \$line);
+	$self->_setRcp($rcp, 'ft', $ft);
 	$self->_setRcp($rcp, 'file', $file);
 	$self->_setRcp($rcp, 'line', $line);
     }
@@ -2939,7 +2950,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011::Scan - Scan C source
 
 =head1 VERSION
 
-version 0.35
+version 0.36
 
 =head1 SYNOPSIS
 

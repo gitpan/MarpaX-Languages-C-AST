@@ -14,7 +14,7 @@ use XML::LibXML;
 
 # ABSTRACT: C source scan (C::Scan alternative)
 
-our $VERSION = '0.35'; # VERSION
+our $VERSION = '0.36'; # TRIAL VERSION
 
 # PODNAME: cscan
 
@@ -202,7 +202,7 @@ cscan - C source scan (C::Scan alternative)
 
 =head1 VERSION
 
-version 0.35
+version 0.36
 
 =head1 AUTHOR
 
@@ -583,7 +583,7 @@ and
 
  cscan --get strings,macros -I/tmp/dir1 -DMYDEFINE /tmp/file.c
 
-are equivalent.
+are equivalent. A restriction is that the filename must be the last argument.
 
 =head1 SEE ALSO
 
