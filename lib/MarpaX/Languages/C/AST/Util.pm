@@ -12,10 +12,10 @@ use Carp qw/croak/;
 # Marpa follows Unicode recommendation, i.e. perl's \R, that cannot be in a character class
 our $NEWLINE_REGEXP = qr/(?>\x0D\x0A|\v)/;
 
-our $VERSION = '0.36'; # TRIAL VERSION
+our $VERSION = '0.37'; # VERSION
 # CONTRIBUTORS
 
-our @EXPORT_OK = qw/whoami whowasi traceAndUnpack logCroak showLineAndCol lineAndCol lastCompleted startAndLength/;
+our @EXPORT_OK = qw/whoami whowasi traceAndUnpack logCroak showLineAndCol lineAndCol lastCompleted startAndLength rulesByDepth/;
 our %EXPORT_TAGS = ('all' => [ @EXPORT_OK ]);
 
 
@@ -146,6 +146,80 @@ sub lastCompleted {
 }
 
 
+sub rulesByDepth {
+    my ($impl, $subGrammar) = @_;
+
+    $subGrammar ||= 'G1';
+
+    #
+    # We start by expanding all ruleIds to a LHS symbol id and RHS symbol ids
+    #
+    my %ruleIds = ();
+    foreach ($impl->rule_ids($subGrammar)) {
+      my $ruleId = $_;
+      $ruleIds{$ruleId} = [ $impl->rule_expand($ruleId, $subGrammar) ];
+    }
+    #
+    # We ask what is the start symbol
+    #
+    my $startSymbolId = $impl->start_symbol_id();
+    #
+    # We search for the start symbol in all the rules
+    #
+    my @queue = ();
+    my %depth = ();
+    foreach (keys %ruleIds) {
+	my $ruleId = $_;
+	if ($ruleIds{$ruleId}->[0] == $startSymbolId) {
+	    push(@queue, $ruleId);
+	    $depth{$ruleId} = 0;
+	}
+    }
+
+    while (@queue) {
+	my $ruleId = shift(@queue);
+	my $newDepth = $depth{$ruleId} + 1;
+	#
+	# Get the RHS ids of this ruleId and select only those that are also LHS
+	#
+	my (undef, @rhsIds) = @{$ruleIds{$ruleId}};
+	foreach (@rhsIds) {
+	    my $lhsId = $_;
+	    foreach (keys %ruleIds) {
+		my $ruleId = $_;
+		if (! exists($depth{$ruleId})) {
+		    #
+		    # Rule not already inserted
+		    #
+		    if ($ruleIds{$ruleId}->[0] == $lhsId) {
+			#
+			# And having an LHS id equal to one of the RHS ids we dequeued
+			#
+			push(@queue, $ruleId);
+			$depth{$ruleId} = $newDepth;
+		    }
+		}
+	    }
+	}
+    }
+
+    my @rc = ();
+    foreach (sort {($depth{$a} <=> $depth{$b}) || ($a <=> $b)} keys %depth) {
+      my $ruleId = $_;
+      my ($lhsId, @rhsIds) = @{$ruleIds{$ruleId}};
+      push(@rc, {ruleId   => $ruleId,
+		 ruleName => $impl->rule_name($ruleId),
+                 lhsId    => $lhsId,
+                 lhsName  => $impl->symbol_name($lhsId),
+                 rhsIds   => [ @rhsIds ],
+                 rhsNames => [ map {$impl->symbol_name($_)} @rhsIds ],
+                 depth    => $depth{$ruleId}});
+    }
+
+    return \@rc;
+}
+
+
 1;
 
 __END__
@@ -160,7 +234,7 @@ MarpaX::Languages::C::AST::Util - C Translation to AST - Class method utilities
 
 =head1 VERSION
 
-version 0.36
+version 0.37
 
 =head1 SYNOPSIS
 
@@ -215,6 +289,42 @@ Returns the output of Marpa's g1_location_to_span at a given $g1 location. Defau
 =head2 lastCompleted($impl, $symbol)
 
 Returns the string corresponding the last completion of $symbol.
+
+=head2 depth($impl, $subGrammar)
+
+Returns an array of rules ordered by depth for optional sub grammar $subGrammar (default is 'G1'). Each array item is a hash reference with the following keys:
+
+=over
+
+=item ruleId
+
+Rule Id
+
+=item ruleName
+
+Rule Id
+
+=item lhsId
+
+LHS id of this rule
+
+=item lhsName
+
+LHS name of this rule
+
+=item rhsIds
+
+Rhs ids of this rule as an array reference
+
+=item rhsNames
+
+Rhs names of this rule as an array reference
+
+=depth
+
+Rule depth
+
+=back
 
 =head1 AUTHOR
 

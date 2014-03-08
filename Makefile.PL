@@ -41,7 +41,7 @@ my %WriteMakefileArgs = (
     "Log::Any" => 0,
     "Log::Any::Adapter" => 0,
     "Log::Log4perl" => 0,
-    "Marpa::R2" => "2.080000",
+    "Marpa::R2" => "2.081001",
     "POSIX" => 0,
     "Pod::Usage" => 0,
     "Regexp::Common" => 0,
@@ -69,7 +69,7 @@ my %WriteMakefileArgs = (
     "Test::More" => 0,
     "Test::Trap" => 0
   },
-  "VERSION" => "0.36",
+  "VERSION" => "0.37",
   "test" => {
     "TESTS" => "t/*.t"
   }
@@ -98,7 +98,7 @@ my %FallbackPrereqs = (
   "Log::Any" => 0,
   "Log::Any::Adapter" => 0,
   "Log::Log4perl" => 0,
-  "Marpa::R2" => "2.080000",
+  "Marpa::R2" => "2.081001",
   "POSIX" => 0,
   "Pod::Usage" => 0,
   "Regexp::Common" => 0,

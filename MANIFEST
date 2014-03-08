@@ -52,7 +52,10 @@ t/gcc-asm.t
 t/gcc_extension.t
 t/if-if-else.data
 t/if-if-else.t
+t/obscure_typedef_newstyle.t
+t/obscure_typedef_oldstyle.t
 t/scan.t
+t/struct.t
 t/syntax-error.t
 t/wikipedia-01.t
 t/wikipedia-02.t

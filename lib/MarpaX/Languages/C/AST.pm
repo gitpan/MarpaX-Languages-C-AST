@@ -17,7 +17,7 @@ use Regexp::Common qw/comment delimited/;
 our $WS_RE = qr/[ \t\v\n\f]/;          # C.f. doAsmOpaque()
 our $ASM_COMMENT_RE = qr/(?:;[^\n]*|$RE{comment}{'C++'})/;
 
-our $VERSION = '0.36'; # TRIAL VERSION
+our $VERSION = '0.37'; # VERSION
 
 
 # ----------------------------------------------------------------------------------------
@@ -32,9 +32,8 @@ sub new {
   map {$logInfo{$_}++} @{$logInfo};
 
   my $grammarName = $opts{grammarName} || 'ISO-ANSI-C-2011';
-  my $start = $opts{start} || '';
 
-  my $grammar = MarpaX::Languages::C::AST::Grammar->new($grammarName, \%logInfo, $start);
+  my $grammar = MarpaX::Languages::C::AST::Grammar->new($grammarName, \%logInfo, $opts{start});
   my $grammar_option = $grammar->grammar_option();
   $grammar_option->{bless_package} = 'C::AST';
   $grammar_option->{source} = \$grammar->content();
@@ -79,7 +78,7 @@ sub new {
 	       _typedef            => $typedef,
 	       _enum               => $enum,
 	       _lazy               => $lazy,
-	       _start              => $start
+	       _start              => $opts{start}
               };
 
   bless($self, $class);
@@ -719,7 +718,7 @@ MarpaX::Languages::C::AST - Translate a C source to an AST
 
 =head1 VERSION
 
-version 0.36
+version 0.37
 
 =head1 SYNOPSIS
 
@@ -879,6 +878,10 @@ Jean-Damien Durand <jeandamiendurand@free.fr>
 =head1 CONTRIBUTORS
 
 =over 4
+
+=item *
+
+Ben Bullock <benkasminbullock@gmail.com>
 
 =item *
 

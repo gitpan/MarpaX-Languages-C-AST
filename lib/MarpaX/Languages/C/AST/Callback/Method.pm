@@ -16,7 +16,7 @@ use Class::Struct
 
 use Carp qw/croak/;
 
-our $VERSION = '0.36'; # TRIAL VERSION
+our $VERSION = '0.37'; # VERSION
 
 
 1;
@@ -33,7 +33,7 @@ MarpaX::Languages::C::AST::Callback::Method - Code reference for the Simple call
 
 =head1 VERSION
 
-version 0.36
+version 0.37
 
 =head1 DESCRIPTION
 

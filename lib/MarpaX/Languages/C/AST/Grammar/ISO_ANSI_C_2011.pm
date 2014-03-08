@@ -8,7 +8,7 @@ use IO::String;
 
 # ABSTRACT: ISO ANSI C 2011 grammar written in Marpa BNF
 
-our $VERSION = '0.36'; # TRIAL VERSION
+our $VERSION = '0.37'; # VERSION
 
 
 our %DEFAULT_PAUSE = (
@@ -51,7 +51,15 @@ sub new {
 
   $self->{_content} = '';
   my $allb = exists($pause{__ALL__});
-  $start ||= 'translationUnit';
+  my $pragmas = '';
+  if (defined($start) && "$start") {
+    #
+    # User gave a custom start, we assume he will hit inaccessible symbols
+    #
+    $pragmas = "\ninaccessible is ok by default\n";
+  } else {
+    $start = 'translationUnit';
+  }
   my $data = IO::String->new($DATA);
   while (defined($_ = <$data>)) {
       my $line = $_;
@@ -77,6 +85,7 @@ sub new {
       $self->{_content} .= $line;
   }
 
+  $self->{_content} =~ s/\$PRAGMAS\n/$pragmas/;
   $self->{_content} =~ s/\$START\n/$start/;
 
   bless($self, $class);
@@ -114,7 +123,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011 - ISO ANSI C 2011 grammar wr
 
 =head1 VERSION
 
-version 0.36
+version 0.37
 
 =head1 SYNOPSIS
 
@@ -171,7 +180,7 @@ __DATA__
 #                   http://www.quut.com/c/ANSI-C-grammar-y-2011.html
 #
 ################################################################################################################
-
+$PRAGMAS
 #
 # Defaults
 #
@@ -627,7 +636,10 @@ event 'parameterDeclarationdeclarationSpecifiers$' = completed <parameterDeclara
 parameterDeclarationdeclarationSpecifiers ::= declarationSpecifiers
 
 event 'parameterDeclarationCheck$' = completed <parameterDeclarationCheck>
-parameterDeclarationCheck ::= parameterDeclarationdeclarationSpecifiers declarator
+parameterDeclarationCheck ::= parameterDeclarationdeclarationSpecifiers parameterDeclarationCheckDeclarator
+
+event 'parameterDeclarationCheckDeclarator$' = completed <parameterDeclarationCheckDeclarator>
+parameterDeclarationCheckDeclarator ::= declarator
 
 parameterDeclaration
 	::= parameterDeclarationCheck               rank =>  0

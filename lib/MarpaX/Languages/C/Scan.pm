@@ -8,7 +8,7 @@ package MarpaX::Languages::C::Scan;
 use MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011::Scan;
 use Carp qw/croak/;
 
-our $VERSION = '0.36'; # TRIAL VERSION
+our $VERSION = '0.37'; # VERSION
 
 
 sub new {
@@ -40,20 +40,20 @@ MarpaX::Languages::C::Scan - C::Scan-like interface
 
 =head1 VERSION
 
-version 0.36
+version 0.37
 
 =head1 SYNOPSIS
 
     use MarpaX::Languages::C::Scan;
     my $cSourceCode = <<C_SOURCE_CODE;
 
-typedef int myInt_type;
-typedef enum myEnum1_e {X11 = 0, X12} myEnumType1_t, *myEnumType1p_t;
-typedef enum {X21 = 0, X22} myEnumType2_t, *myEnumType2p_t;
-typedef struct myStruct1 {int x;} myStructType1_t, *myStructType1p_t;
-typedef struct {int x;} myStructType2_t, *myStructType2p_t;
+    typedef int myInt_type;
+    typedef enum myEnum1_e {X11 = 0, X12} myEnumType1_t, *myEnumType1p_t;
+    typedef enum {X21 = 0, X22} myEnumType2_t, *myEnumType2p_t;
+    typedef struct myStruct1 {int x;} myStructType1_t, *myStructType1p_t;
+    typedef struct {int x;} myStructType2_t, *myStructType2p_t;
 
-C_SOURCE_CODE
+    C_SOURCE_CODE
     my $scan = MarpaX::Languages::C::Scan->new(content => $cSourceCode);
 
 =head1 DESCRIPTION

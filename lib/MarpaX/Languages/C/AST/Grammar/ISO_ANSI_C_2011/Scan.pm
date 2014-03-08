@@ -56,7 +56,7 @@ our %KEY2ID = (
 our @PURGE_KEYS = sort {$KEY2ID{$a} <=> $KEY2ID{$b}} grep {$KEY2ID{$_} >= $KEY2ID{_MAX}} keys %KEY2ID;
 our $PURGE_IDX  = $KEY2ID{$PURGE_KEYS[0]};
 
-our $VERSION = '0.36'; # TRIAL VERSION
+our $VERSION = '0.37'; # VERSION
 
 
 # ----------------------------------------------------------------------------------------
@@ -2634,7 +2634,8 @@ sub _analyseParameterDeclarationCheck {
     #
     # parameterDeclarationCheck is:
     #
-    # parameterDeclarationCheck ::= parameterDeclarationdeclarationSpecifiers declarator
+    # parameterDeclarationCheck ::= parameterDeclarationdeclarationSpecifiers parameterDeclarationCheckDeclarator
+    # parameterDeclarationCheckDeclarator ::= declarator
     # parameterDeclarationdeclarationSpecifiers ::= declarationSpecifiers
     #
     # i.e. we are back to a routine very similar to _analyseInitDeclarator...
@@ -2645,7 +2646,7 @@ sub _analyseParameterDeclarationCheck {
 	return 0;
     }
     my $newRcp = $self->_newRcp();
-    my $declarator  = $parameterDeclarationCheck->[1];
+    my $declarator = $parameterDeclarationCheck->[1]->[0];
     if (!$self->_analyseDeclarator($stdout_buf, $declarator, $newRcp)) {
 	return 0;
     }
@@ -2950,7 +2951,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011::Scan - Scan C source
 
 =head1 VERSION
 
-version 0.36
+version 0.37
 
 =head1 SYNOPSIS
 

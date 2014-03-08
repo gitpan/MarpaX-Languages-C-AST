@@ -2,7 +2,7 @@ NAME
     MarpaX::Languages::C::AST - Translate a C source to an AST
 
 VERSION
-    version 0.36
+    version 0.37
 
 SYNOPSIS
         use strict;
@@ -178,6 +178,8 @@ AUTHOR
     Jean-Damien Durand <jeandamiendurand@free.fr>
 
 CONTRIBUTORS
+    *   Ben Bullock <benkasminbullock@gmail.com>
+
     *   Jeffrey Kegler <JKEGL@cpan.org>
 
     *   Jeffrey Kegler <jkegl@cpan.org>

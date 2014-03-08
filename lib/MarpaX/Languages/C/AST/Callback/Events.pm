@@ -14,7 +14,7 @@ use constant LHS_PROCESS_EVENT => '<process>';
 use constant CLOSEANYSCOPE_PRIORITY => -1000;
 use constant RESETANYDATA_PRIORITY => -2000;
 
-our $VERSION = '0.36'; # TRIAL VERSION
+our $VERSION = '0.37'; # VERSION
 
 
 sub new {
@@ -65,9 +65,8 @@ sub new {
     #
     # Isolated to single rule:
     #
-    # declarationCheck ::= declarationCheckdeclarationSpecifiers declarationCheckinitDeclaratorList
-    #                      SEMICOLON action => deref
-    # ################################################################################################
+    # declarationCheck ::= declarationCheckdeclarationSpecifiers declarationCheckinitDeclaratorList SEMICOLON
+    # #######################################################################################################################
     my @callbacks = ();
     push(@callbacks,
          $self->_register_rule_callbacks({
@@ -89,7 +88,7 @@ sub new {
                                           # structDeclaration will be hitted only once.
                                           # ---------------------------
                                           counters => {
-                                                       'structContext' => [ 'structContextStart[]', 'structContextEnd[]' ]
+                                                       'structContext' => [ 'structContextStart[]', 'structContextEnd[]', 'level' ]
                                                       },
                                           process_priority => CLOSEANYSCOPE_PRIORITY - 1,
                                          }
@@ -109,9 +108,9 @@ sub new {
     #
     # functionDefinitionCheck1 ::= functionDefinitionCheck1declarationSpecifiers declarator
     #                              functionDefinitionCheck1declarationList
-    #                              compoundStatementReenterScope action => deref
+    #                              compoundStatementReenterScope
     # functionDefinitionCheck2 ::= functionDefinitionCheck2declarationSpecifiers declarator
-    #                              compoundStatementReenterScope action => deref
+    #                              compoundStatementReenterScope
     #
     # Note: We want the processing to happen before the scopes are really closed.
     # ------------------------------------------------------------------------------------------
@@ -142,7 +141,7 @@ sub new {
     # ------------------------------------------------------------------------------------------
     # In:
     # parameterDeclaration ::= declarationSpecifiers declarator
-    # typedef is syntactically allowed but never valid.
+    # typedef is syntactically allowed but never valid, but can be obscured by a local parameter.
     #
     # Isolated to:
     #
@@ -151,8 +150,12 @@ sub new {
     push(@callbacks,
          $self->_register_rule_callbacks({
                                           lhs => 'parameterDeclarationCheck',
-                                          rhs => [ [ 'parameterDeclarationdeclarationSpecifiers', [ [ 'storageClassSpecifierTypedef', 'typedef' ] ] ]
+                                          rhs => [ [ 'parameterDeclarationdeclarationSpecifiers', [ [ 'storageClassSpecifierTypedef', 'typedef' ] ] ],
+                                                   [ 'parameterDeclarationCheckDeclarator',       [ [ 'directDeclaratorIdentifier', sub { $outerSelf->{_lastIdentifier} } ] ] ]
                                                  ],
+                                          counters => {
+                                                       'structContext' => [ 'structContextStart[]', 'structContextEnd[]', 'level' ]
+                                                      },
                                           method => \&_parameterDeclarationCheck,
                                          }
                                         )
@@ -275,6 +278,7 @@ sub _parameterDeclarationCheck {
     # Get the topics data we are interested in
     #
     my $parameterDeclarationdeclarationSpecifiers = $callback->topic_level_fired_data('parameterDeclarationdeclarationSpecifiers$');
+    my $parameterDeclarationCheckDeclarator = $callback->topic_fired_data('parameterDeclarationCheckDeclarator$');
 
     #
     # By definition parameterDeclarationdeclarationSpecifiers contains only typedefs
@@ -284,6 +288,15 @@ sub _parameterDeclarationCheck {
 	my ($start_lengthp, $line_columnp, $last_completed)  = @{$parameterDeclarationdeclarationSpecifiers->[0]};
 	logCroak("[%s[%d]] %s is not valid in a parameter declaration\n%s\n", whoami(__PACKAGE__), $callback->currentTopicLevel, $last_completed, showLineAndCol(@{$line_columnp}, $callback->hscratchpad('_sourcep')));
     }
+    #
+    # By definition parameterDeclarationCheckDeclarator contains only directDeclaratorIdentifier
+    #
+    _enterOrObscureTypedef($callback, $nbTypedef, $parameterDeclarationCheckDeclarator);
+    #
+    # We are called at every parameterDeclarationCheck, and parameterDeclarationCheckDeclarator is an aggregation
+    # of all directDeclaratorIdentifier. We don't need this data anymore
+    #
+    $callback->reset_topic_fired_data('parameterDeclarationCheckDeclarator$');
 }
 # ----------------------------------------------------------------------------------------
 sub _functionDefinitionCheck1 {
@@ -331,13 +344,6 @@ sub _declarationCheck {
     my ($method, $callback, $eventsp) = @_;
 
     #
-    # Check if we are in structContext context
-    #
-    my $structContext = $callback->topic_fired_data('structContext') || [0];
-    if ($structContext->[0]) {
-	return;
-    }
-    #
     # Get the topics data we are interested in
     #
     my $declarationCheckdeclarationSpecifiers = $callback->topic_fired_data('declarationCheckdeclarationSpecifiers$');
@@ -356,18 +362,25 @@ sub _declarationCheck {
 	my ($start_lengthp, $line_columnp, $last_completed)  = @{$declarationCheckdeclarationSpecifiers->[1]};
 	logCroak("[%s[%d]] %s cannot appear more than once\n%s\n", whoami(__PACKAGE__), $callback->currentTopicLevel, $last_completed, showLineAndCol(@{$line_columnp}, $callback->hscratchpad('_sourcep')));
     }
-    my $scope = $callback->hscratchpad('_scope');
 
-    foreach (@{$declarationCheckinitDeclaratorList}) {
-	my ($start_lengthp, $line_columnp, $last_completed, %counters)  = @{$_};
-        if (! $counters{structContext}) {
-          if ($nbTypedef >= 0) {
-	    $scope->parseEnterTypedef($last_completed, $start_lengthp);
-          } else {
-	    $scope->parseObscureTypedef($last_completed);
-          }
-        }
+    _enterOrObscureTypedef($callback, $nbTypedef, $declarationCheckinitDeclaratorList);
+}
+# ----------------------------------------------------------------------------------------
+sub _enterOrObscureTypedef {
+  my ($callback, $nbTypedef, $directDeclaratorIdentifierArrayp) = @_;
+
+  my $scope = $callback->hscratchpad('_scope');
+
+  foreach (@{$directDeclaratorIdentifierArrayp}) {
+    my ($start_lengthp, $line_columnp, $last_completed, %counters)  = @{$_};
+    if (! $counters{structContext}) {
+      if ($nbTypedef >= 0) {
+        $scope->parseEnterTypedef($last_completed, $start_lengthp);
+      } else {
+        $scope->parseObscureTypedef($last_completed);
+      }
     }
+  }
 }
 # ----------------------------------------------------------------------------------------
 sub _enterScopeCallback {
@@ -402,7 +415,7 @@ sub _storage_helper {
 	$rc = [ [ $start, $length ], lineAndCol($impl, $g1, $start), %counters ];
     } elsif (substr($event, -1, 1) eq '$') {
         if (defined($callbackValue)) {
-          $rc = [ [ $start, $length ], lineAndCol($impl, $g1, $start), &$callbackValue() ];
+          $rc = [ [ $start, $length ], lineAndCol($impl, $g1, $start), &$callbackValue(), %counters ];
         } else {
           substr($event, -1, 1, '');
           $rc = [ [ $start, $length ], lineAndCol($impl, $g1, $start), $fixedValue || lastCompleted($impl, $event), %counters ];
@@ -433,7 +446,7 @@ sub _storage_helper_optimized {
 	$rc = [ [ $start, $length ], lineAndCol($_[7], $g1, $start), %counters ];
     } elsif (substr($event, -1, 1) eq '$') {
         if (defined($callbackValue)) {
-          $rc = [ [ $start, $length ], lineAndCol($_[7], $g1, $start), &$callbackValue() ];
+          $rc = [ [ $start, $length ], lineAndCol($_[7], $g1, $start), &$callbackValue(), %counters ];
         } else {
           substr($event, -1, 1, '');
           $rc = [ [ $start, $length ], lineAndCol($_[7], $g1, $start), $_[5] || lastCompleted($_[7], $event), %counters ];
@@ -565,7 +578,8 @@ sub _register_rule_callbacks {
   my $countersHashp = $hashp->{counters} || {};
   foreach (keys %{$countersHashp}) {
     my $counter = $_;
-    my ($eventStart, $eventEnd) = @{$countersHashp->{$counter}};
+    my ($eventStart, $eventEnd, $persistence) = @{$countersHashp->{$counter}};
+    $persistence ||= 'any';
     ++$rshProcessEvents{$eventStart};
     $callback->register(MarpaX::Languages::C::AST::Callback::Method->new
                         (
@@ -576,7 +590,7 @@ sub _register_rule_callbacks {
                          option => MarpaX::Languages::C::AST::Callback::Option->new
                          (
                           topic => {$counter => 1},
-                          topic_persistence => 'any',
+                          topic_persistence => $persistence,
                           condition => [ [ 'auto' ] ],  # == match on description
                           priority => 999,
                          )
@@ -592,7 +606,7 @@ sub _register_rule_callbacks {
                          option => MarpaX::Languages::C::AST::Callback::Option->new
                          (
                           topic => {$counter => 1},
-                          topic_persistence => 'any',
+                          topic_persistence => $persistence,
                           condition => [ [ 'auto' ] ],  # == match on description
                           priority => 999,
                          )
@@ -797,7 +811,7 @@ MarpaX::Languages::C::AST::Callback::Events - Events callback when translating a
 
 =head1 VERSION
 
-version 0.36
+version 0.37
 
 =head1 DESCRIPTION
 

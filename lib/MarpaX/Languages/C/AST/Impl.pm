@@ -6,11 +6,11 @@ package MarpaX::Languages::C::AST::Impl;
 # ABSTRACT: Implementation of Marpa's interface
 
 # use MarpaX::Languages::C::AST::Util qw/traceAndUnpack/;
-use Marpa::R2 2.080000;
+use Marpa::R2 2.081001;
 use Carp qw/croak/;
 use MarpaX::Languages::C::AST::Impl::Logger;
 
-our $VERSION = '0.36'; # TRIAL VERSION
+our $VERSION = '0.37'; # VERSION
 
 our $MARPA_TRACE_FILE_HANDLE;
 our $MARPA_TRACE_BUFFER;
@@ -153,6 +153,31 @@ sub show_progress {
   return $_[0]->{recce}->show_progress(@_[1..$#_]);
 }
 
+
+sub start_symbol_id {
+  return $_[0]->{grammar}->start_symbol_id(@_[1..$#_]);
+}
+
+
+sub rule_ids {
+  return $_[0]->{grammar}->rule_ids(@_[1..$#_]);
+}
+
+
+sub symbol_name {
+  return $_[0]->{grammar}->symbol_name(@_[1..$#_]);
+}
+
+
+sub rule_name {
+  return $_[0]->{grammar}->rule_name(@_[1..$#_]);
+}
+
+
+sub rule_expand {
+  return $_[0]->{grammar}->rule_expand(@_[1..$#_]);
+}
+
 1;
 
 __END__
@@ -167,7 +192,7 @@ MarpaX::Languages::C::AST::Impl - Implementation of Marpa's interface
 
 =head1 VERSION
 
-version 0.36
+version 0.37
 
 =head1 SYNOPSIS
 
@@ -262,6 +287,26 @@ Returns Marpa's recognizer's terminals_expected.
 =head2 show_progress($self)
 
 Returns Marpa's recognizer's show_progress.
+
+=head2 start_symbol_id($self)
+
+Returns Marpa's grammar's start_symbol_id.
+
+=head2 rule_ids($self)
+
+Returns Marpa's grammar's rule_ids.
+
+=head2 symbol_name($self)
+
+Returns Marpa's grammar's symbol_name.
+
+=head2 rule_name($self)
+
+Returns Marpa's grammar's rule_name.
+
+=head2 rule_expand($self)
+
+Returns Marpa's grammar's rule_expand.
 
 =head1 AUTHOR
 
