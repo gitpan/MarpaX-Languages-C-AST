@@ -9,7 +9,7 @@ use MarpaX::Languages::C::AST::Util qw/whoami/;
 use Log::Any qw/$log/;
 use Carp qw/croak/;
 
-our $VERSION = '0.37'; # VERSION
+our $VERSION = '0.38'; # VERSION
 
 
 sub new {
@@ -242,7 +242,7 @@ __END__
 
 =pod
 
-=encoding utf-8
+=encoding UTF-8
 
 =head1 NAME
 
@@ -250,7 +250,7 @@ MarpaX::Languages::C::AST::Scope - Scope management when translating a C source 
 
 =head1 VERSION
 
-version 0.37
+version 0.38
 
 =head1 SYNOPSIS
 

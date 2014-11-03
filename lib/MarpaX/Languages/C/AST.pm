@@ -17,7 +17,7 @@ use Regexp::Common qw/comment delimited/;
 our $WS_RE = qr/[ \t\v\n\f]/;          # C.f. doAsmOpaque()
 our $ASM_COMMENT_RE = qr/(?:;[^\n]*|$RE{comment}{'C++'})/;
 
-our $VERSION = '0.37'; # VERSION
+our $VERSION = '0.38'; # VERSION
 
 
 # ----------------------------------------------------------------------------------------
@@ -710,7 +710,7 @@ __END__
 
 =pod
 
-=encoding utf-8
+=encoding UTF-8
 
 =head1 NAME
 
@@ -718,7 +718,7 @@ MarpaX::Languages::C::AST - Translate a C source to an AST
 
 =head1 VERSION
 
-version 0.37
+version 0.38
 
 =head1 SYNOPSIS
 
@@ -876,6 +876,8 @@ L<https://github.com/jddurand/marpax-languages-c-ast>
 Jean-Damien Durand <jeandamiendurand@free.fr>
 
 =head1 CONTRIBUTORS
+
+=for stopwords Ben Bullock Jeffrey Kegler jddurand
 
 =over 4
 
