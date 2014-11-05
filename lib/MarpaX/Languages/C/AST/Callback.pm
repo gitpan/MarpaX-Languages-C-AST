@@ -34,7 +34,7 @@ use Class::Struct
 
 use Carp qw/croak/;
 
-our $VERSION = '0.38'; # VERSION
+our $VERSION = '0.39'; # VERSION
 
 
 sub _sort_by_option_priority_desc {
@@ -721,7 +721,7 @@ MarpaX::Languages::C::AST::Callback - Simple but powerful callback generic frame
 
 =head1 VERSION
 
-version 0.38
+version 0.39
 
 =head1 DESCRIPTION
 

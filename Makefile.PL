@@ -7,13 +7,18 @@ use 5.010;
 
 use ExtUtils::MakeMaker;
 
+use File::ShareDir::Install;
+$File::ShareDir::Install::INCLUDE_DOTFILES = 1;
+$File::ShareDir::Install::INCLUDE_DOTDIRS = 1;
+install_share dist => "share";
 
 
 my %WriteMakefileArgs = (
   "ABSTRACT" => "Translate a C source to an AST",
   "AUTHOR" => "Jean-Damien Durand <jeandamiendurand\@free.fr>",
   "CONFIGURE_REQUIRES" => {
-    "ExtUtils::MakeMaker" => 0
+    "ExtUtils::MakeMaker" => 0,
+    "File::ShareDir::Install" => "0.06"
   },
   "DISTNAME" => "MarpaX-Languages-C-AST",
   "EXE_FILES" => [
@@ -67,7 +72,7 @@ my %WriteMakefileArgs = (
     "Test::More" => 0,
     "Test::Trap" => 0
   },
-  "VERSION" => "0.38",
+  "VERSION" => "0.39",
   "test" => {
     "TESTS" => "t/*.t"
   }
@@ -81,6 +86,7 @@ my %FallbackPrereqs = (
   "Exporter" => 0,
   "ExtUtils::MakeMaker" => 0,
   "File::Basename" => 0,
+  "File::ShareDir::Install" => "0.06",
   "File::Slurp" => 0,
   "File::Spec" => 0,
   "File::Temp" => 0,
@@ -130,5 +136,10 @@ if ( $^O eq 'MSWin32' ) {
 
 WriteMakefile(%WriteMakefileArgs);
 
+{
+package
+MY;
+use File::ShareDir::Install qw(postamble);
+}
 
 

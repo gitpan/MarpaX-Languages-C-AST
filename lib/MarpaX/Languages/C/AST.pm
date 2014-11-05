@@ -17,7 +17,7 @@ use Regexp::Common qw/comment delimited/;
 our $WS_RE = qr/[ \t\v\n\f]/;          # C.f. doAsmOpaque()
 our $ASM_COMMENT_RE = qr/(?:;[^\n]*|$RE{comment}{'C++'})/;
 
-our $VERSION = '0.38'; # VERSION
+our $VERSION = '0.39'; # VERSION
 
 
 # ----------------------------------------------------------------------------------------
@@ -718,7 +718,7 @@ MarpaX::Languages::C::AST - Translate a C source to an AST
 
 =head1 VERSION
 
-version 0.38
+version 0.39
 
 =head1 SYNOPSIS
 

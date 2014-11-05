@@ -8,7 +8,7 @@ use IO::String;
 
 # ABSTRACT: ISO ANSI C 2011 grammar written in Marpa BNF
 
-our $VERSION = '0.38'; # VERSION
+our $VERSION = '0.39'; # VERSION
 
 
 our %DEFAULT_PAUSE = (
@@ -123,7 +123,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011 - ISO ANSI C 2011 grammar wr
 
 =head1 VERSION
 
-version 0.38
+version 0.39
 
 =head1 SYNOPSIS
 
@@ -722,6 +722,7 @@ statement
 labeledStatement
 	::= IDENTIFIER COLON statement
 	| CASE constantExpression COLON statement
+	| CASE constantExpression (WS_MANY) ELLIPSIS (WS_MANY) constantExpression COLON statement
 	| DEFAULT COLON statement
 
 compoundStatement
@@ -759,12 +760,13 @@ jumpStatement
 	| RETURN expression SEMICOLON
 
 event 'translationUnit$' = completed <translationUnit>
-translationUnit ::= externalDeclaration+
+translationUnit ::= externalDeclaration*
 
 event '^externalDeclaration' = predicted <externalDeclaration>
 externalDeclaration
 	::= functionDefinition
 	| declaration
+        | (SEMICOLON)
 
 compoundStatementReenterScope ::= LCURLY_REENTERSCOPE RCURLY_SCOPE
 	                        | LCURLY_REENTERSCOPE blockItemList RCURLY_SCOPE
@@ -839,7 +841,7 @@ CP_maybe   ~
 SP         ~ 'u8' | [uUL]
 SP_maybe   ~ SP
 SP_maybe   ~
-ES_AFTERBS ~ [\'\"\?\\abfnrtv]
+ES_AFTERBS ~ [\'\"\?\\abfnrtve]
            | O
            | O O
            | O O O
@@ -848,6 +850,7 @@ ES         ~ BS ES_AFTERBS
 WS         ~ [ \t\v\n\f]
 WS_any     ~ WS*
 WS_many    ~ WS+
+WS_MANY    ~ WS+
 
 # Lexemes
 :lexeme ~ <AUTO>          priority => -1

@@ -10,7 +10,7 @@ use Marpa::R2 2.081001;
 use Carp qw/croak/;
 use MarpaX::Languages::C::AST::Impl::Logger;
 
-our $VERSION = '0.38'; # VERSION
+our $VERSION = '0.39'; # VERSION
 
 our $MARPA_TRACE_FILE_HANDLE;
 our $MARPA_TRACE_BUFFER;
@@ -192,7 +192,7 @@ MarpaX::Languages::C::AST::Impl - Implementation of Marpa's interface
 
 =head1 VERSION
 
-version 0.38
+version 0.39
 
 =head1 SYNOPSIS
 

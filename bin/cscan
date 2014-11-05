@@ -14,7 +14,7 @@ use XML::LibXML;
 
 # ABSTRACT: C source scan (C::Scan alternative)
 
-our $VERSION = '0.38'; # VERSION
+our $VERSION = '0.39'; # VERSION
 
 # PODNAME: cscan
 
@@ -202,7 +202,7 @@ cscan - C source scan (C::Scan alternative)
 
 =head1 VERSION
 
-version 0.38
+version 0.39
 
 =head1 AUTHOR
 

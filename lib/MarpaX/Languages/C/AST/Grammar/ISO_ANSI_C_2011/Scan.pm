@@ -15,6 +15,7 @@ use IO::File;
 use Scalar::Util qw/blessed reftype/;
 use Regexp::Common;
 use String::ShellQuote qw/shell_quote_best_effort/;  # Not for Win32, but passes everywhere, so ok to use it like that
+use Log::Any qw/$log/;
 use constant {
     LEXEME_POSITION_INDEX => 0,
     LEXEME_LENGTH_INDEX => 1,
@@ -56,7 +57,7 @@ our %KEY2ID = (
 our @PURGE_KEYS = sort {$KEY2ID{$a} <=> $KEY2ID{$b}} grep {$KEY2ID{$_} >= $KEY2ID{_MAX}} keys %KEY2ID;
 our $PURGE_IDX  = $KEY2ID{$PURGE_KEYS[0]};
 
-our $VERSION = '0.38'; # VERSION
+our $VERSION = '0.39'; # VERSION
 
 
 # ----------------------------------------------------------------------------------------
@@ -416,21 +417,15 @@ sub typedef_structs {
   foreach (@{$self->decls}) {
       if ($self->_existsRcp($_, 'typedef') && $self->_getRcp($_, 'typedef')) {
         my $ty = $self->_getRcp($_, 'ty');
-        #
-        # In case of typedef struct, the type is: struct STRUCTTYPE
-        #
-        if ($ty =~ /^struct\s+([\w]+)$/) {
-          $ty = substr($ty, $-[1], $+[1] - $-[1]);
-        }
         my $nm = $self->_getRcp($_, 'nm');
         #
         # If the type is a struct or an union, then there must
-        # exist another entry at the toplevel with that name that
+        # exist another entry at the toplevel with that type that
         # have the flag 'structOrUnion'
         #
         my @structOrUnion = grep {
           $self->_getRcp($_, 'structOrUnion') &&
-            $self->_getRcp($_, 'nm') eq $ty
+            $self->_getRcp($_, 'ty') eq $ty
           } @{$self->decls};
         if (! @structOrUnion) {
           $hash{$nm} = undef;
@@ -439,9 +434,7 @@ sub typedef_structs {
           my @elements = ();
           foreach (@{$self->_getRcp($structOrUnion, 'args')}) {
             #
-            # Because a struct or union can very well have
-            # defined inner types: ye are only interested by
-            # variables
+            # We are only interested by variables
             #
             if ($self->_getRcp($_, 'var')) {
               push(@elements,
@@ -902,6 +895,9 @@ sub _analyseDeclarationCheck {
 sub _buildContext {
     my ($self, $stdout_buf, $specifiersList, $contextp, $listp) = @_;
 
+    #
+    # A context is build under two conditions: declarationSpecifiers or specifierQualifierList
+    #
     if (blessed($specifiersList) eq 'C::AST::declarationSpecifiers') {
 	if (! $self->_analyseDeclarationSpecifiers($stdout_buf, $specifiersList, $contextp)) {
 	    return 0;
@@ -910,42 +906,10 @@ sub _buildContext {
 	if (! $self->_analyseSpecifierQualifierList($stdout_buf, $specifiersList, $contextp)) {
 	    return 0;
 	}
+    } else {
+      $log->warnf('_buildContext() called on object blessed as %s', blessed($specifiersList) || '');
+      return 0;
     }
-    #
-    # The context can not only give current type, but also be a new storage type specifier:
-    # - Enum cases, simpler but also orthogonal, are treated explicitely in _analyseEnumSpecifier.
-    # - Struct cases are treated here.
-    #
-    if ($self->_existsRcp($contextp, 'struct') && $self->_getRcp($contextp, 'struct')) {
-	#
-	# Look to _analyseStructOrUnionSpecifier and you will see it can set only
-	# the following fields:
-	# 'nm'
-	# 'struct'
-	# 'args'
-	# 'ty'
-	# 'structOrUnion'
-	#
-	my $newRcp = $self->_newRcp();
-	foreach (qw/nm struct args ty structOrUnion/) {
-	    $self->_setRcp($newRcp, $_, $self->_getRcp($contextp, $_));
-	}
-	#
-	# Force 'type' flag
-	#
-	$self->_setRcp($newRcp, 'type', 1);
-	#
-	# Push to same-level context
-	#
-	push(@{$listp}, $newRcp);
-	#
-	# List of fields we delete: all but 'ty'
-	#
-	foreach (qw/nm struct args structOrUnion type/) {
-	    $self->_deleteRcp($contextp, $_);
-	}
-    }
-
     #
     # Add startPosition - used to get full text
     #
@@ -2890,7 +2854,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011::Scan - Scan C source
 
 =head1 VERSION
 
-version 0.38
+version 0.39
 
 =head1 SYNOPSIS
 
