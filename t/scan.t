@@ -4,22 +4,30 @@ use warnings FATAL => 'all';
 use Test::More tests => 10;
 use Test::Differences;
 use File::Spec;
-use Data::Dumper;
-#use C::Scan;
+use Path::Tiny qw/path/;
+
+my $path;
+
+BEGIN { $path = path(File::Spec->curdir)->absolute->stringify;
+        $path =~ /(.*)/;
+        $path = $1;
+}
+
+use Test::File::ShareDir
+    -root  =>  $path,
+    -share =>  {
+	-module => { 'MarpaX::Languages::C::AST' => File::Spec->curdir },
+	-dist => { 'MarpaX-Languages-C-AST' => File::Spec->curdir },
+};
+#------------------------------------------------------
 
 BEGIN {
     push(@INC, 'inc');
     use_ok( 'MarpaX::Languages::C::Scan' ) || print "Bail out!\n";
 }
 
-#
-# I do not want to bother with file/line - too much OS/compiler specific
-#
-$ENV{MARPAX_LANGUAGES_C_AST_SCAN_TEST} = 1;
-
 my $filename = File::Spec->catfile('inc', 'scan.c');
-my $c = MarpaX::Languages::C::Scan->new(filename => $filename, asHash => 1);
-#my $cscan = C::Scan->new(filename => $filename, filename_filter => $filename);
+my $c = MarpaX::Languages::C::Scan->new(filename => $filename);
 
 eq_or_diff($c->defines_no_args,
           {
@@ -57,25 +65,25 @@ eq_or_diff($c->parsed_fdecls,
               'int',
               'x1',
               undef,
-              '',
+              'int x1',
               ''
              ],
              [
-              'double *',
+              'double',
               'x2',
               undef,
-              '',
+              'double *x2',
               ''
              ],
              [
-              'float *',
+              'float',
               'f1',
               undef,
+              'float *( f1)(int x11, double x12)',
               '',
-              ''
              ]
             ],
-            '',
+            'int func1(int x1, double *x2, float *( f1)(int x11, double x12))',
             undef
            ],
            [
@@ -86,25 +94,25 @@ eq_or_diff($c->parsed_fdecls,
               'int',
               'x1',
               undef,
-              '',
+              'int x1',
               ''
              ],
              [
-              'double *',
+              'double',
               'x2',
               undef,
-              '',
+              'double *x2',
               ''
              ],
              [
-              'float *',
+              'float',
               'f1',
               undef,
+              'float *(*f1)(int x11, double x12)',
               '',
-              ''
              ]
             ],
-            '',
+            'int func2(int x1, double *x2, float *(*f1)(int x11, double x12))',
             undef
            ],
            [
@@ -113,27 +121,27 @@ eq_or_diff($c->parsed_fdecls,
             [
              [
               'int',
-              'arg0',
+              'ANON0',
               undef,
-              '',
+              'int',
               ''
              ],
              [
+              'double',
+              'ANON1',
+              undef,
               'double *',
-              'arg1',
-              undef,
-              '',
               ''
              ],
              [
-              'float *',
-              'arg2',
+              'float',
+              'ANON2',
               undef,
-              '',
+              'float *(* )(int , double )',
               ''
              ]
             ],
-            '',
+            'int func3(int , double * , float *(* )(int , double ))',
             undef
            ],
            [
@@ -142,158 +150,97 @@ eq_or_diff($c->parsed_fdecls,
             [
              [
               'int',
-              'arg0',
+              'ANON3',
               undef,
-              '',
+              'int',
               ''
              ],
              [
+              'double',
+              'ANON4',
+              undef,
               'double *',
-              'arg1',
-              undef,
-              '',
               ''
              ],
              [
-              'float *',
-              'arg2',
+              'float',
+              'ANON5',
               undef,
-              '',
+              'float *(* )(int , double )',
               ''
              ]
             ],
-            '',
+            'int func4(int , double * , float *(* )(int , double ))',
             undef
            ]
           ],
           'parsed_fdecls');
 eq_or_diff($c->typedef_hash,
 {
-          'myStructType1p_t' => [
-                                  '',
-                                  ''
-                                ],
-          'myEnumType2p_t' => [
-                                '',
-                                ''
-                              ],
-          'myStructType1_t' => [
-                                 '',
-                                 ''
-                               ],
-          'myEnumType2_t' => [
-                               '',
-                               ''
-                             ],
-          'myStructType2p_t' => [
-                                  '',
-                                  ''
-                                ],
-          'myStructType2_t' => [
-                                 '',
-                                 ''
-                               ],
-          'myInt_type' => [
-                            '',
-                            ''
-                          ],
-          'myEnumType1p_t' => [
-                                '',
-                                ''
-                              ],
-          'myEnumType1_t' => [
-                               '',
-                               ''
-                             ]
+    'myStructType1_t'  => [ 'struct myStruct1 {int x;}',   '' ],
+    'myStructType1p_t' => [ 'struct myStruct1 {int x;} *', '' ],
+
+    'myEnumType2_t'  => [ 'enum {X21 = 0, X22}',   '' ],
+    'myEnumType2p_t' => [ 'enum {X21 = 0, X22} *', '' ],
+
+    'myStructType2_t'  => [ 'struct {int x;}',   '' ],
+    'myStructType2p_t' => [ 'struct {int x;} *', '' ],
+
+    'myInt_type' => [ 'int', '' ],
+
+    'myEnumType1_t'  => [ 'enum myEnum1_e {X11 = 0, X12}',   '' ],
+    'myEnumType1p_t' => [ 'enum myEnum1_e {X11 = 0, X12} *', '' ],
+
+    'myOpaqueStruct_t'  => [ 'struct opaqueStruct',   '' ],
+    'myOpaqueStructp_t' => [ 'struct opaqueStruct *', '' ],
 },
-          'typedef_hash');
+    'typedef_hash');
 eq_or_diff($c->typedefs_maybe,
     [
+     'myInt_type',
      'myEnumType1_t',
      'myEnumType1p_t',
      'myEnumType2_t',
      'myEnumType2p_t',
-     'myInt_type',
      'myStructType1_t',
      'myStructType1p_t',
      'myStructType2_t',
-     'myStructType2p_t'
+     'myStructType2p_t',
+     'myOpaqueStruct_t',
+     'myOpaqueStructp_t'
     ],
     'typedefs_maybe');
 eq_or_diff($c->vdecls,
     [
-     'vdouble2p',
-     'vint1'
+     'extern int vint1;',
+     'extern double * vdouble2p;'
     ],
     'vdecls');
 eq_or_diff($c->vdecl_hash,
 {
-    'vdouble2p' => [
-        '',
-        ''
-        ],
-        'vint1' => [
-            '',
-            ''
-        ]
+ 'vdouble2p' => [ 'double * ', '' ],
+ 'vint1'     => [ 'int', '' ]
 },
-    'vdecl_hash');
+  'vdecl_hash');
 eq_or_diff($c->typedef_structs,
 {
  'myStructType2_t' => [
-		       [
-			'',
-			'',
-			'x'
-		       ]
+		       [ 'int', '', 'x' ]
 		      ],
  'myStructType1_t' => [
-		       [
-			'',
-			'',
-			'x'
-		       ]
+		       [ 'int', '', 'x' ]
 		      ],
  'myStructType1p_t' => [
-			[
-			 '',
-			 '',
-			 'x'
-			]
+			[ 'int', '', 'x' ]
 		       ],
  'myStructType2p_t' => [
-			[
-			 '',
-			 '',
-			 'x'
-			]
+			[ 'int', '', 'x' ]
 		       ],
  'myEnumType1_t' => undef,
  'myEnumType1p_t' => undef,
  'myInt_type' => undef,
  'myEnumType2p_t' => undef,
  'myEnumType2_t' => undef,
+ 'myOpaqueStruct_t' => [],
+ 'myOpaqueStructp_t' => [],
 }, 'typedef_structs');
-
-#TODO: {
-#    local $TODO = 'C::Scan cmp MarpaX::Languages::C::Scan';
-#    print STDERR <<BIGWARN;
-#
-#=====================================================
-#The following tests are likely to fail - do not worry
-#=====================================================
-#
-#BIGWARN
-#    foreach (qw/defines_no_args
-#                defines_args
-#                includes
-#                parsed_fdecls
-#                typedef_hash
-#                typedef_texts
-#                typedefs_maybe
-#                vdecls
-#                vdecl_hash
-#                typedef_structs/) {
-#        eval {eq_or_diff($cscan->get($_), $c->get($_), , $_)};
-#    }
-#}

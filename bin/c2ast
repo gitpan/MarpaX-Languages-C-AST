@@ -23,7 +23,7 @@ autoflush STDOUT 1;
 
 # ABSTRACT: C source analysis
 
-our $VERSION = '0.39'; # VERSION
+our $VERSION = '0.40'; # TRIAL VERSION
 
 # PODNAME: c2ast
 
@@ -356,7 +356,7 @@ c2ast - C source analysis
 
 =head1 VERSION
 
-version 0.39
+version 0.40
 
 =head1 SYNOPSIS
 

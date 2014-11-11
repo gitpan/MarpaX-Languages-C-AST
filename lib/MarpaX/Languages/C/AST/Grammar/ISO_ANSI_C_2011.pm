@@ -8,7 +8,7 @@ use IO::String;
 
 # ABSTRACT: ISO ANSI C 2011 grammar written in Marpa BNF
 
-our $VERSION = '0.39'; # VERSION
+our $VERSION = '0.40'; # TRIAL VERSION
 
 
 our %DEFAULT_PAUSE = (
@@ -26,14 +26,20 @@ our %DEFAULT_PAUSE = (
     ANY_ASM              => 'after',
 );
 
+our $DEFAULTACTIONOBJECT = sprintf('%s::%s', __PACKAGE__, 'Actions');
+our $DEFAULTNONTERMINALSEMANTIC = ':default ::= action => [values] bless => ::lhs';
+our $DEFAULTTERMINALSEMANTIC = 'lexeme default = action => [start,length,value] forgiving => 1';
+
 our $DATA = do {local $/; <DATA>};
 
 sub new {
-  my ($class, $pausep, $start) = @_;
+  my ($class, $pausep, $start, $actionObject, $nonTerminalSemantic, $terminalSemantic) = @_;
+
+  $actionObject //= $DEFAULTACTIONOBJECT;
 
   my $self  = {
-    _grammar_option => {action_object  => sprintf('%s::%s', __PACKAGE__, 'Actions')},
-    _recce_option => {ranking_method => 'high_rule_only'},
+    _grammar_option => {},
+    _recce_option => {semantics_package => $actionObject, ranking_method => 'high_rule_only'},
   };
   #
   # Rework the grammar to have the pauses:
@@ -84,9 +90,13 @@ sub new {
       }
       $self->{_content} .= $line;
   }
+  $nonTerminalSemantic //= $DEFAULTNONTERMINALSEMANTIC;
+  $terminalSemantic //= $DEFAULTTERMINALSEMANTIC;
 
   $self->{_content} =~ s/\$PRAGMAS\n/$pragmas/;
   $self->{_content} =~ s/\$START\n/$start/;
+  $self->{_content} =~ s/\$NONTERMINALSEMANTIC\b/$nonTerminalSemantic/;
+  $self->{_content} =~ s/\$TERMINALSEMANTIC\b/$terminalSemantic/;
 
   bless($self, $class);
 
@@ -123,7 +133,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011 - ISO ANSI C 2011 grammar wr
 
 =head1 VERSION
 
-version 0.39
+version 0.40
 
 =head1 SYNOPSIS
 
@@ -143,9 +153,9 @@ This modules contains the ISO ANSI C 2011 C grammar written in Marpa BNF, as of 
 
 =head1 SUBROUTINES/METHODS
 
-=head2 new([$pausep, $start])
+=head2 new([$pausep, $start, $actionObject, $nonTerminalSemantic, $terminalSemantic])
 
-Instance a new object. Takes an eventual reference to a HASH for lexemes for which a pause after is requested, followed by an eventual start rule. Default paused lexemes is hardcoded to a list of lexeme that must always be paused, and this list cannot be altered. Default start rule is 'translationUnit'.
+Instance a new object. Takes an eventual reference to a HASH for lexemes for which a pause after is requested, followed by an eventual start rule, an eventual action object, an eventual default non-terminal semantic action, a default terminal semantic action. Default paused lexemes is hardcoded to a list of lexeme that must always be paused, and this list cannot be altered. Default start rule is 'translationUnit'. Default action object is hardcoded to __PACKAGE__::Actions module. Default non-terminal semantic is hardcoded to ':default ::= action => [values] bless => ::lhs'. Default terminal semantic is hardcoded to :'lexeme default = action => [start,length,value] forgiving => 1'.
 
 =head2 content()
 
@@ -184,8 +194,8 @@ $PRAGMAS
 #
 # Defaults
 #
-:default ::= action => [values] bless => ::lhs
-lexeme default = action => [start,length,value] forgiving => 1
+$NONTERMINALSEMANTIC
+$TERMINALSEMANTIC
 
 #
 # G1 (grammar), c.f. http://www.quut.com/c/ANSI-C-grammar-y-2011.html
@@ -222,9 +232,7 @@ string
 genericSelection
 	::= GENERIC LPAREN assignmentExpression COMMA genericAssocList RPAREN
 
-genericAssocList
-	::= genericAssociation
-	| genericAssocList COMMA genericAssociation
+genericAssocList ::= genericAssociation+ separator => COMMA proper => 1
 
 genericAssociation
 	::= typeName COLON assignmentExpression
@@ -429,9 +437,7 @@ declarationSpecifiers2 ::=       # List with one or more typeSpecifier2
 
 # declarationSpecifiers ::= declarationSpecifiersUnit+
 
-initDeclaratorList
-	::= initDeclarator
-	| initDeclaratorList COMMA initDeclarator
+initDeclaratorList ::= initDeclarator+ separator => COMMA proper => 1
 
 initDeclarator
 	::= declarator EQUAL initializer
@@ -484,8 +490,8 @@ event 'structContextEnd[]' = nulled <structContextEnd>
 structContextEnd ::=
 
 structOrUnionSpecifier
-	::= structOrUnion LCURLY <structContextStart> structDeclarationList RCURLY <structContextEnd>
-	| structOrUnion IDENTIFIER_UNAMBIGUOUS LCURLY <structContextStart> structDeclarationList RCURLY <structContextEnd>
+	::= structOrUnion LCURLY (<structContextStart>) structDeclarationList RCURLY (<structContextEnd>)
+	| structOrUnion IDENTIFIER_UNAMBIGUOUS LCURLY (<structContextStart>) structDeclarationList RCURLY (<structContextEnd>)
 	| structOrUnion IDENTIFIER_UNAMBIGUOUS
 
 structOrUnion
@@ -528,9 +534,7 @@ specifierQualifierList2 ::= # List with one or more typeSpecifier2
                           | specifierQualifierList2 typeQualifier
                           | specifierQualifierList2 gccExtension
 
-structDeclaratorList
-	::= structDeclarator
-	| structDeclaratorList COMMA structDeclarator
+structDeclaratorList ::= structDeclarator+ separator => COMMA proper => 1
 
 structDeclarator
 	::= COLON constantExpression
@@ -539,14 +543,13 @@ structDeclarator
 
 enumSpecifier
 	::= ENUM LCURLY enumeratorList RCURLY
-	| ENUM LCURLY enumeratorList COMMA RCURLY
 	| ENUM IDENTIFIER_UNAMBIGUOUS LCURLY enumeratorList RCURLY
-	| ENUM IDENTIFIER_UNAMBIGUOUS LCURLY enumeratorList COMMA RCURLY
 	| ENUM IDENTIFIER_UNAMBIGUOUS
 
-enumeratorList
-	::= enumerator
-	| enumeratorList COMMA enumerator
+#
+# Saying 0 allow to have a final COMMA after the list
+#
+enumeratorList ::= enumerator+ separator => COMMA proper => 0
 
 enumerator	# identifiers must be flagged as ENUMERATION_CONSTANT
 	::= enumerationConstant EQUAL constantExpression
@@ -628,9 +631,7 @@ parameterTypeList
 	::= parameterList COMMA ELLIPSIS
 	| parameterList
 
-parameterList
-	::= parameterDeclaration
-	| parameterList COMMA parameterDeclaration
+parameterList ::= parameterDeclaration+ separator => COMMA proper => 1
 
 event 'parameterDeclarationdeclarationSpecifiers$' = completed <parameterDeclarationdeclarationSpecifiers>
 parameterDeclarationdeclarationSpecifiers ::= declarationSpecifiers
@@ -646,9 +647,7 @@ parameterDeclaration
 	| declarationSpecifiers abstractDeclarator  rank => -1
 	| declarationSpecifiers                     rank => -2
 
-identifierList
-	::= IDENTIFIER
-	| identifierList COMMA IDENTIFIER
+identifierList ::= IDENTIFIER+ separator => COMMA proper => 1
 
 typeName
 	::= specifierQualifierList abstractDeclarator

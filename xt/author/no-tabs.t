@@ -18,6 +18,7 @@ my @files = (
     'lib/MarpaX/Languages/C/AST/Grammar/ISO_ANSI_C_2011.pm',
     'lib/MarpaX/Languages/C/AST/Grammar/ISO_ANSI_C_2011/Actions.pm',
     'lib/MarpaX/Languages/C/AST/Grammar/ISO_ANSI_C_2011/Scan.pm',
+    'lib/MarpaX/Languages/C/AST/Grammar/ISO_ANSI_C_2011/Scan/Actions.pm',
     'lib/MarpaX/Languages/C/AST/Impl.pm',
     'lib/MarpaX/Languages/C/AST/Impl/Logger.pm',
     'lib/MarpaX/Languages/C/AST/Scope.pm',

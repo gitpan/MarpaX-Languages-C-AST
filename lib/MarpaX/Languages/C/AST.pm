@@ -17,7 +17,7 @@ use Regexp::Common qw/comment delimited/;
 our $WS_RE = qr/[ \t\v\n\f]/;          # C.f. doAsmOpaque()
 our $ASM_COMMENT_RE = qr/(?:;[^\n]*|$RE{comment}{'C++'})/;
 
-our $VERSION = '0.39'; # VERSION
+our $VERSION = '0.40'; # TRIAL VERSION
 
 
 # ----------------------------------------------------------------------------------------
@@ -33,7 +33,7 @@ sub new {
 
   my $grammarName = $opts{grammarName} || 'ISO-ANSI-C-2011';
 
-  my $grammar = MarpaX::Languages::C::AST::Grammar->new($grammarName, \%logInfo, $opts{start});
+  my $grammar = MarpaX::Languages::C::AST::Grammar->new($grammarName, \%logInfo, $opts{start}, $opts{actionObject}, $opts{nonTerminalSemantic}, $opts{terminalSemantic});
   my $grammar_option = $grammar->grammar_option();
   $grammar_option->{bless_package} = 'C::AST';
   $grammar_option->{source} = \$grammar->content();
@@ -718,7 +718,7 @@ MarpaX::Languages::C::AST - Translate a C source to an AST
 
 =head1 VERSION
 
-version 0.39
+version 0.40
 
 =head1 SYNOPSIS
 
@@ -789,6 +789,18 @@ A flag saying the parser to inject automatically all allowed alternatives when t
 A string giving the starting point of the grammar. This should be used when you know that the source code to parse is not a full valid source, but a portion of if. This requires knowledge of the grammar rules. Default is empty string: '', i.e. let the grammar apply its default start rule.
 
 Please note that giving another value but 'translationUnit' will emit warnings from the grammar, saying that some rules are not reachable.
+
+=item actionObject
+
+Grammar specific action object.
+
+=item nonTerminalSemantic
+
+Grammar specific non-terminal semantic action.
+
+=item terminalSemantic
+
+Grammar specific terminal semantic action.
 
 =item logInfo
 

@@ -25,6 +25,7 @@ typedef enum myEnum1_e {X11 = 0, X12} myEnumType1_t, *myEnumType1p_t;
 typedef enum {X21 = 0, X22} myEnumType2_t, *myEnumType2p_t;
 typedef struct myStruct1 {int x;} myStructType1_t, *myStructType1p_t;
 typedef struct {int x;} myStructType2_t, *myStructType2p_t;
+typedef struct opaqueStruct myOpaqueStruct_t, *myOpaqueStructp_t;
 /*
   vdecls, vdecl_hash tests
 */

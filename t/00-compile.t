@@ -6,7 +6,7 @@ use warnings;
 
 use Test::More;
 
-plan tests => 17 + ($ENV{AUTHOR_TESTING} ? 1 : 0);
+plan tests => 18 + ($ENV{AUTHOR_TESTING} ? 1 : 0);
 
 my @module_files = (
     'MarpaX/Languages/C/AST.pm',
@@ -18,6 +18,7 @@ my @module_files = (
     'MarpaX/Languages/C/AST/Grammar/ISO_ANSI_C_2011.pm',
     'MarpaX/Languages/C/AST/Grammar/ISO_ANSI_C_2011/Actions.pm',
     'MarpaX/Languages/C/AST/Grammar/ISO_ANSI_C_2011/Scan.pm',
+    'MarpaX/Languages/C/AST/Grammar/ISO_ANSI_C_2011/Scan/Actions.pm',
     'MarpaX/Languages/C/AST/Impl.pm',
     'MarpaX/Languages/C/AST/Impl/Logger.pm',
     'MarpaX/Languages/C/AST/Scope.pm',

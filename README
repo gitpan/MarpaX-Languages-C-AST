@@ -2,7 +2,7 @@ NAME
     MarpaX::Languages::C::AST - Translate a C source to an AST
 
 VERSION
-    version 0.39
+    version 0.40
 
 SYNOPSIS
         use strict;
@@ -102,6 +102,15 @@ SUBROUTINES/METHODS
         Please note that giving another value but 'translationUnit' will
         emit warnings from the grammar, saying that some rules are not
         reachable.
+
+    actionObject
+        Grammar specific action object.
+
+    nonTerminalSemantic
+        Grammar specific non-terminal semantic action.
+
+    terminalSemantic
+        Grammar specific terminal semantic action.
 
     logInfo
         Reference to an array of lexemes for which a log of level INFO will
