@@ -8,7 +8,7 @@ package MarpaX::Languages::C::Scan;
 use MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011::Scan;
 use Carp qw/croak/;
 
-our $VERSION = '0.40'; # TRIAL VERSION
+our $VERSION = '0.41'; # TRIAL VERSION
 
 
 sub new {
@@ -40,7 +40,7 @@ MarpaX::Languages::C::Scan - C::Scan-like interface
 
 =head1 VERSION
 
-version 0.40
+version 0.41
 
 =head1 SYNOPSIS
 

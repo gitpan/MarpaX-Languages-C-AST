@@ -6,7 +6,7 @@ use warnings;
 
 use Test::More;
 
-plan tests => 18 + ($ENV{AUTHOR_TESTING} ? 1 : 0);
+plan tests => 20 + ($ENV{AUTHOR_TESTING} ? 1 : 0);
 
 my @module_files = (
     'MarpaX/Languages/C/AST.pm',
@@ -24,11 +24,13 @@ my @module_files = (
     'MarpaX/Languages/C/AST/Scope.pm',
     'MarpaX/Languages/C/AST/Util.pm',
     'MarpaX/Languages/C/AST/Util/Data/Find.pm',
-    'MarpaX/Languages/C/Scan.pm'
+    'MarpaX/Languages/C/Scan.pm',
+    'MarpaX/Languages/C/Scan/Actions.pm'
 );
 
 my @scripts = (
     'bin/c2ast',
+    'bin/cdecl',
     'bin/cscan'
 );
 

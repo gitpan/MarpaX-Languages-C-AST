@@ -8,7 +8,7 @@ use IO::String;
 
 # ABSTRACT: ISO ANSI C 2011 grammar written in Marpa BNF
 
-our $VERSION = '0.40'; # TRIAL VERSION
+our $VERSION = '0.41'; # TRIAL VERSION
 
 
 our %DEFAULT_PAUSE = (
@@ -28,7 +28,7 @@ our %DEFAULT_PAUSE = (
 
 our $DEFAULTACTIONOBJECT = sprintf('%s::%s', __PACKAGE__, 'Actions');
 our $DEFAULTNONTERMINALSEMANTIC = ':default ::= action => [values] bless => ::lhs';
-our $DEFAULTTERMINALSEMANTIC = 'lexeme default = action => [start,length,value] forgiving => 1';
+our $DEFAULTTERMINALSEMANTIC = 'lexeme default = action => [start,length,value,name] forgiving => 1';
 
 our $DATA = do {local $/; <DATA>};
 
@@ -133,7 +133,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011 - ISO ANSI C 2011 grammar wr
 
 =head1 VERSION
 
-version 0.40
+version 0.41
 
 =head1 SYNOPSIS
 
@@ -600,12 +600,12 @@ directDeclarator
 	| LPAREN declarator RPAREN
 	| directDeclarator LBRACKET RBRACKET
 	| directDeclarator LBRACKET STAR RBRACKET
-	| directDeclarator LBRACKET STATIC gccArrayTypeModifierList assignmentExpression RBRACKET
+	| directDeclarator LBRACKET STATIC typeQualifierList assignmentExpression RBRACKET
 	| directDeclarator LBRACKET STATIC assignmentExpression RBRACKET
-	| directDeclarator LBRACKET gccArrayTypeModifierList STAR RBRACKET
-	| directDeclarator LBRACKET gccArrayTypeModifierList STATIC assignmentExpression RBRACKET
-	| directDeclarator LBRACKET gccArrayTypeModifierList assignmentExpression RBRACKET
-	| directDeclarator LBRACKET gccArrayTypeModifierList RBRACKET
+	| directDeclarator LBRACKET typeQualifierList STAR RBRACKET
+	| directDeclarator LBRACKET typeQualifierList STATIC assignmentExpression RBRACKET
+	| directDeclarator LBRACKET typeQualifierList assignmentExpression RBRACKET
+	| directDeclarator LBRACKET typeQualifierList RBRACKET
 	| directDeclarator LBRACKET assignmentExpression RBRACKET
 	| directDeclarator LPAREN_SCOPE parameterTypeList RPAREN_SCOPE
 	| directDeclarator LPAREN_SCOPE RPAREN_SCOPE
@@ -621,7 +621,7 @@ pointer
 	| msvsAttributeAny STAR pointer
 	| msvsAttributeAny STAR
 
-gccArrayTypeModifierList ::= gccArrayTypeModifier+
+typeQualifierList ::= typeQualifier+
 
 #typeQualifierList
 #	::= typeQualifier
@@ -664,19 +664,19 @@ directAbstractDeclarator
 	::= LPAREN abstractDeclarator RPAREN
 	| LBRACKET RBRACKET
 	| LBRACKET STAR RBRACKET
-	| LBRACKET STATIC gccArrayTypeModifierList assignmentExpression RBRACKET
+	| LBRACKET STATIC typeQualifierList assignmentExpression RBRACKET
 	| LBRACKET STATIC assignmentExpression RBRACKET
-	| LBRACKET gccArrayTypeModifierList STATIC assignmentExpression RBRACKET
-	| LBRACKET gccArrayTypeModifierList assignmentExpression RBRACKET
-	| LBRACKET gccArrayTypeModifierList RBRACKET
+	| LBRACKET typeQualifierList STATIC assignmentExpression RBRACKET
+	| LBRACKET typeQualifierList assignmentExpression RBRACKET
+	| LBRACKET typeQualifierList RBRACKET
 	| LBRACKET assignmentExpression RBRACKET
 	| directAbstractDeclarator LBRACKET RBRACKET
 	| directAbstractDeclarator LBRACKET STAR RBRACKET
-	| directAbstractDeclarator LBRACKET STATIC gccArrayTypeModifierList assignmentExpression RBRACKET
+	| directAbstractDeclarator LBRACKET STATIC typeQualifierList assignmentExpression RBRACKET
 	| directAbstractDeclarator LBRACKET STATIC assignmentExpression RBRACKET
-	| directAbstractDeclarator LBRACKET gccArrayTypeModifierList assignmentExpression RBRACKET
-	| directAbstractDeclarator LBRACKET gccArrayTypeModifierList STATIC assignmentExpression RBRACKET
-	| directAbstractDeclarator LBRACKET gccArrayTypeModifierList RBRACKET
+	| directAbstractDeclarator LBRACKET typeQualifierList assignmentExpression RBRACKET
+	| directAbstractDeclarator LBRACKET typeQualifierList STATIC assignmentExpression RBRACKET
+	| directAbstractDeclarator LBRACKET typeQualifierList RBRACKET
 	| directAbstractDeclarator LBRACKET assignmentExpression RBRACKET
 	| LPAREN_SCOPE RPAREN_SCOPE
 	| LPAREN_SCOPE parameterTypeList RPAREN_SCOPE
@@ -765,7 +765,7 @@ event '^externalDeclaration' = predicted <externalDeclaration>
 externalDeclaration
 	::= functionDefinition
 	| declaration
-        | (SEMICOLON)
+        | SEMICOLON
 
 compoundStatementReenterScope ::= LCURLY_REENTERSCOPE RCURLY_SCOPE
 	                        | LCURLY_REENTERSCOPE blockItemList RCURLY_SCOPE
@@ -1325,8 +1325,6 @@ gccAsmOperand ::= string LPAREN expression RPAREN
 gccAsmClobber ::= string
 
 gccStatementExpression ::= LPAREN compoundStatement RPAREN
-
-gccArrayTypeModifier ::= typeQualifier
 
 # @since 2.6.264
 # for error handling: second assignmentExpression is always last parameter name

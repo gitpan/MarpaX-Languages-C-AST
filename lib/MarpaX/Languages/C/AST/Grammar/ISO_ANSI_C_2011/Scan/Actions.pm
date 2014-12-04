@@ -2,69 +2,38 @@ use strict;
 use warnings FATAL => 'all';
 
 package MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011::Scan::Actions;
-use XML::LibXML;
-use Scalar::Util qw/blessed/;
-use Carp qw/croak/;
+use parent qw/MarpaX::Languages::C::Scan::Actions/;
+use SUPER;
 
 # ABSTRACT: ISO ANSI C 2011 grammar actions in Scan mode
 
-our $VERSION = '0.40'; # TRIAL VERSION
+our $VERSION = '0.41'; # TRIAL VERSION
 
 
+#
+# Because Marpa is using $CODE{}
+#
 sub new {
-    my $class = shift;
-    my $self = {
-		dom => XML::LibXML::Document->new(),
-	       };
-    bless($self, $class);
-    return $self;
+  super();
 }
 
 sub nonTerminalSemantic {
-  my $self = shift;
+  super();
+}
 
-  my $rule_id     = $Marpa::R2::Context::rule;
-  my $slg         = $Marpa::R2::Context::slg;
-  my ($lhs, @rhs) = map { $slg->symbol_display_form($_) } $slg->rule_expand($rule_id);
-  my $maxRhs = $#rhs;
+sub getRuleDescription {
+  my ($self) = @_;
 
-  my $node = XML::LibXML::Element->new($lhs);
+  my ($lhs, @rhs) = super();
 
-  foreach (0..$#_) {
-    my $child;
-    if (ref($_[$_]) eq 'ARRAY') {
-      #
-      # This is a lexeme
-      #
-      my $name;
-      if ($_ > $maxRhs) {
-	if ($maxRhs == 0) {
-	  #
-	  # Ok only if $maxRhs is 0 : this is (probably) a sequence
-	  #
-	  $name = $rhs[0];
-	} else {
-	  croak "Too many arguments on the stack. Rule was: $lhs ::= @rhs\n";
-	}
-      } else {
-	$name = $rhs[$_];
-      }
-      $child = XML::LibXML::Element->new($name);
-      $child->setAttribute('start', $_[$_]->[0]);
-      $child->setAttribute('length', $_[$_]->[1]);
-      $child->setAttribute('text', $_[$_]->[2]);
-    } else {
-      $child = $_[$_];
-    }
-    $node->addChild($child);
-  }
+  #
+  # Remove known hiden terms that rule_expand do not remove
+  #
+  my @okRhs = grep {$_ ne 'structContextStart' &&
+		    $_ ne 'structContextEnd' &&
+		    $_ ne 'WS_MANY'} @rhs;
 
-  if ($lhs eq 'translationUnit') {
-    $self->{dom}->addChild($node);
-    return $self->{dom};
-  } else {
-    return $node;
-  }
+  return ($lhs, @okRhs);
 }
 
 1;
@@ -81,7 +50,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011::Scan::Actions - ISO ANSI C 
 
 =head1 VERSION
 
-version 0.40
+version 0.41
 
 =head1 DESCRIPTION
 

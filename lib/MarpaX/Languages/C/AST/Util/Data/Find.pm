@@ -6,19 +6,25 @@ package MarpaX::Languages::C::AST::Util::Data::Find;
 use Scalar::Util qw/blessed/;
 use Carp qw/croak/;
 
+our $_endOfElement = 0;
+
 # ABSTRACT: Find data in C AST
 
-our $VERSION = '0.40'; # TRIAL VERSION
+our $VERSION = '0.41'; # TRIAL VERSION
 
 
 sub new {
   my ($class, %options) = @_;
 
   my $self  = {
-    _wanted => $options{wanted} || sub {return 1;},
-    _wantedArgs => $options{wantedArgs} || [],
-    _callback => $options{callback} || sub {},
-    _callbackArgs => $options{callbackArgs} || []
+    _endOfElement     => $options{endOfElement}     || sub {},
+    _endOfElementArgs => $options{endOfElementArgs} || [],
+
+    _wanted           => $options{wanted}           || sub {return 1;},
+    _wantedArgs       => $options{wantedArgs}       || [],
+
+    _callback         => $options{callback}         || sub {},
+    _callbackArgs     => $options{callbackArgs}     || []
   };
 
   bless $self, $class;
@@ -34,15 +40,22 @@ sub process {
     my $rc = 0;
     do {
 	my $obj = shift @worklist;
-	if ($self->{_wanted}(@{$self->{_wantedArgs}}, $obj)) {
+
+	my $ref = ref($obj);
+	if ($ref eq 'SCALAR' && $obj == \$_endOfElement) {
+	  $obj = shift @worklist;
+	  $self->{_endOfElement}(@{$self->{_endOfElementArgs}}, $obj);
+	  $rc = 1;
+	} else {
+	  if ($self->{_wanted}(@{$self->{_wantedArgs}}, $obj)) {
 	    $rc = 1;
 	    $self->{_callback}(@{$self->{_callbackArgs}}, $obj);
-	}
-	my $ref_type = ref $obj;
-	if (blessed($obj) || $ref_type eq 'ARRAY') {
-	    unshift(@worklist, @{$obj});
-	} else {
-	    croak "Unsupported object type $ref_type\n" if $ref_type;
+	  }
+	  if (blessed($obj) || $ref eq 'ARRAY') {
+	    unshift(@worklist, @{$obj}, \$_endOfElement, $obj);
+	  } else {
+	    croak "Unsupported object type $ref\n" if $ref;
+	  }
 	}
   } while (@worklist);
 
@@ -64,7 +77,7 @@ MarpaX::Languages::C::AST::Util::Data::Find - Find data in C AST
 
 =head1 VERSION
 
-version 0.40
+version 0.41
 
 =head1 SYNOPSIS
 
@@ -98,6 +111,16 @@ This modules is a minimalist Data::Find designed for the parse tree values of Ma
 Instance a new object. Takes as optional argument a hash that may contain the following key/values:
 
 =over
+
+=item endOfElement
+
+End of element callback (CODE ref).
+
+=item endOfElementArgs
+
+End-Of-Element callback arguments (ARRAY ref). The endOfElement callback is called like: &$endOfElement(@{$endOfElementArgs}, $object) where $object is a reference to the object that finishes. If wanted callback is setted, only wanted objects are concerned.
+
+End of element callback (CODE ref).
 
 =item wanted
 

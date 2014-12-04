@@ -1,55 +1,43 @@
 #!perl
 use strict;
 use warnings FATAL => 'all';
-use Test::More tests => 10;
+use Test::More tests => 12;
 use Test::Differences;
-use File::Spec;
-use Path::Tiny qw/path/;
-
-my $path;
-
-BEGIN { $path = path(File::Spec->curdir)->absolute->stringify;
-        $path =~ /(.*)/;
-        $path = $1;
-}
-
-use Test::File::ShareDir
-    -root  =>  $path,
-    -share =>  {
-	-module => { 'MarpaX::Languages::C::AST' => File::Spec->curdir },
-	-dist => { 'MarpaX-Languages-C-AST' => File::Spec->curdir },
-};
-#------------------------------------------------------
 
 BEGIN {
     push(@INC, 'inc');
     use_ok( 'MarpaX::Languages::C::Scan' ) || print "Bail out!\n";
 }
 
+$ENV{MARPAX_LANGUAGES_C_AST_T_SCAN} = 1;
 my $filename = File::Spec->catfile('inc', 'scan.c');
 my $c = MarpaX::Languages::C::Scan->new(filename => $filename);
 
 eq_or_diff($c->defines_no_args,
           {
-              'MACRO_NO_ARGS_01' => '',
-              'MACRO_NO_ARGS_02' => 'something'
+              'MACRO_NO_ARGS_01' => [ 'MACRO_NO_ARGS_01', '', '' ],
+              'MACRO_NO_ARGS_02' => [ 'MACRO_NO_ARGS_02 something', 'something', '' ]
           },
           'defines_no_args');
 eq_or_diff($c->defines_args,
           {
               'MACRO_NO_ARGS_04' =>
                   [
+		   "MACRO_NO_ARGS_04 (b,    c) something(b) + else(c) \\\ncontinued",
                    [
                     'b',
                     'c'
                    ],
-                   "something(b) + else(c) \\\ncontinued"
+                   "something(b) + else(c) \\\ncontinued",
+                   ''
                   ],
                    'MACRO_NO_ARGS_03' =>
                    [
+		    'MACRO_NO_ARGS_03(a)',
                     [
                      'a'
                     ],
+                    '',
                     ''
                    ]
           },
@@ -244,3 +232,19 @@ eq_or_diff($c->typedef_structs,
  'myOpaqueStruct_t' => [],
  'myOpaqueStructp_t' => [],
 }, 'typedef_structs');
+eq_or_diff($c->typedef_texts,
+    [
+     'int myInt_type;',
+     'enum myEnum1_e {X11 = 0, X12} myEnumType1_t, *myEnumType1p_t;',
+     'enum {X21 = 0, X22} myEnumType2_t, *myEnumType2p_t;',
+     'struct myStruct1 {int x;} myStructType1_t, *myStructType1p_t;',
+     'struct {int x;} myStructType2_t, *myStructType2p_t;',
+     'struct opaqueStruct myOpaqueStruct_t, *myOpaqueStructp_t;'
+    ] , 'typedef_texts');
+eq_or_diff($c->fdecls,
+    [
+     'int func1(int x1, double *x2, float *( f1)(int x11, double x12))',
+     'int func2(int x1, double *x2, float *(*f1)(int x11, double x12))',
+     'int func3(int , double * , float *(* )(int , double ))',
+     'int func4(int , double * , float *(* )(int , double ))'
+    ] , 'fdecls');

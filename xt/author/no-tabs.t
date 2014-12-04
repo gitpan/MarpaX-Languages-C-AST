@@ -8,6 +8,7 @@ use Test::NoTabs;
 
 my @files = (
     'bin/c2ast',
+    'bin/cdecl',
     'bin/cscan',
     'lib/MarpaX/Languages/C/AST.pm',
     'lib/MarpaX/Languages/C/AST/Callback.pm',
@@ -25,10 +26,13 @@ my @files = (
     'lib/MarpaX/Languages/C/AST/Util.pm',
     'lib/MarpaX/Languages/C/AST/Util/Data/Find.pm',
     'lib/MarpaX/Languages/C/Scan.pm',
+    'lib/MarpaX/Languages/C/Scan/Actions.pm',
     't/00-compile.t',
     't/00-report-prereqs.dd',
     't/00-report-prereqs.t',
     't/asm-opaque.t',
+    't/cdecl.t',
+    't/complex_declarations.t',
     't/delayed_directDeclaratorIdentifier.t',
     't/discard_GCC_attribute.t',
     't/discard_MSVS_declspec.t',
