@@ -7,7 +7,7 @@ use Carp qw/croak/;
 
 # ABSTRACT: ISO ANSI C grammar actions in Scan mode
 
-our $VERSION = '0.41'; # TRIAL VERSION
+our $VERSION = '0.42'; # VERSION
 
 
 sub new {
@@ -57,7 +57,7 @@ sub nonTerminalSemantic {
   }
 
   if ($lhs eq 'translationUnit') {
-    $self->{dom}->addChild($node);
+    $self->{dom}->setDocumentElement($node);
     return $self->{dom};
   } else {
     return $node;
@@ -88,7 +88,7 @@ MarpaX::Languages::C::Scan::Actions - ISO ANSI C grammar actions in Scan mode
 
 =head1 VERSION
 
-version 0.41
+version 0.42
 
 =head1 DESCRIPTION
 

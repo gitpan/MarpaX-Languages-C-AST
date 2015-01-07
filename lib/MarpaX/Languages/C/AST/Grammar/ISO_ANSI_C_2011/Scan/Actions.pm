@@ -7,7 +7,7 @@ use SUPER;
 
 # ABSTRACT: ISO ANSI C 2011 grammar actions in Scan mode
 
-our $VERSION = '0.41'; # TRIAL VERSION
+our $VERSION = '0.42'; # VERSION
 
 
 #
@@ -50,7 +50,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011::Scan::Actions - ISO ANSI C 
 
 =head1 VERSION
 
-version 0.41
+version 0.42
 
 =head1 DESCRIPTION
 

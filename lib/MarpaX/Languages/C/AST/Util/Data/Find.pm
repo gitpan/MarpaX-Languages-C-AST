@@ -10,7 +10,7 @@ our $_endOfElement = 0;
 
 # ABSTRACT: Find data in C AST
 
-our $VERSION = '0.41'; # TRIAL VERSION
+our $VERSION = '0.42'; # VERSION
 
 
 sub new {
@@ -77,7 +77,7 @@ MarpaX::Languages::C::AST::Util::Data::Find - Find data in C AST
 
 =head1 VERSION
 
-version 0.41
+version 0.42
 
 =head1 SYNOPSIS
 

@@ -7,8 +7,9 @@ package MarpaX::Languages::C::Scan;
 
 use MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011::Scan;
 use Carp qw/croak/;
+use Log::Any qw/$log/;
 
-our $VERSION = '0.41'; # TRIAL VERSION
+our $VERSION = '0.42'; # VERSION
 
 
 sub new {
@@ -23,6 +24,18 @@ sub new {
   } else {
     croak "Unsupported grammar name $grammarName";
   }
+}
+
+# ----------------------------------------------------------------------------------------
+
+
+sub replace {
+  my ($self, $from, $to, $declaration, %options) = @_;
+
+  $log->tracef('Making as AST of %s', $declaration);
+
+  my $c = MarpaX::Languages::C::Scan->new(content => $declaration, %options);
+
 }
 
 
@@ -40,7 +53,7 @@ MarpaX::Languages::C::Scan - C::Scan-like interface
 
 =head1 VERSION
 
-version 0.41
+version 0.42
 
 =head1 SYNOPSIS
 
@@ -83,6 +96,14 @@ ISO ANSI C 2011, with GNU and MSVS extensions. This is the default value.
 =back
 
 Please refer to per-grammar documentation for other options and methods.
+
+=head2 replace($self, $from, $to, $declaration, %options)
+
+In the asDOM mode only, this function is replacing $from by $to in any structure that matche $declaration. For example: with a $declaration value "f(int *x)", if $from is "x" and $to is "x[3]", it is as if the declaration would become "f(int *x[3])".
+
+Only the global structure in terms of children has to be matched. This mean that the example above would have worked as well with a $declaration value of "f(int z, float *x)". Embedded declarations obey the same rule, for instance to match a structure member you only have to write its parents e.g.: "struct y {int x;}", even if in reality "struct y" contains something before "x".
+
+Internall, this method will call again MarpaX::Languages::C::Scan->new(%options) on $declaration, please refer to the new() method for %options description.
 
 =head1 SEE ALSO
 

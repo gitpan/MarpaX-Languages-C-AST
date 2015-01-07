@@ -8,7 +8,7 @@ use IO::String;
 
 # ABSTRACT: ISO ANSI C 2011 grammar written in Marpa BNF
 
-our $VERSION = '0.41'; # TRIAL VERSION
+our $VERSION = '0.42'; # VERSION
 
 
 our %DEFAULT_PAUSE = (
@@ -133,7 +133,7 @@ MarpaX::Languages::C::AST::Grammar::ISO_ANSI_C_2011 - ISO ANSI C 2011 grammar wr
 
 =head1 VERSION
 
-version 0.41
+version 0.42
 
 =head1 SYNOPSIS
 
@@ -720,7 +720,8 @@ statement
 
 labeledStatement
 	::= IDENTIFIER COLON statement
-	| CASE constantExpression COLON statement
+	| CASE constantExpression           COLON statement
+	| CASE constantExpression (WS_MANY) COLON statement
 	| CASE constantExpression (WS_MANY) ELLIPSIS (WS_MANY) constantExpression COLON statement
 	| DEFAULT COLON statement
 

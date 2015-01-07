@@ -9,7 +9,7 @@ use diagnostics;
 use Carp;
 use Log::Any;
 
-our $VERSION = '0.41'; # TRIAL VERSION
+our $VERSION = '0.42'; # VERSION
 
 sub BEGIN {
     #
@@ -29,7 +29,7 @@ sub TIEHANDLE {
 
   my $self = {
               level => exists($options{level}) ? ($options{level} || 'trace') : 'trace',
-              category => exists($options{category}) ? ($options{category} || '') : '',
+              category => exists($options{category}) ? $options{category} : undef, # undef is ok
              };
 
   $self->{logger} = Log::Any->get_logger(category => $self->{category});
@@ -74,7 +74,7 @@ MarpaX::Languages::C::AST::Impl::Logger - Log::Any implementation on top of Marp
 
 =head1 VERSION
 
-version 0.41
+version 0.42
 
 =head1 DESCRIPTION
 
